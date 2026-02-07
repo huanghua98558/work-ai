@@ -5,41 +5,107 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { z } from "zod";
-import { randomBytes } from "crypto";
 
 /**
- * 创建机器人验证 Schema
+ * 绑定机器人验证 Schema
  */
-const createRobotSchema = z.object({
-  name: z.string().min(1).max(100).default("未命名机器人"),
+const bindRobotSchema = z.object({
+  // 机器人ID（必填）
+  robotId: z.string().min(1),
+  // 用户自定义名称（可选）
+  name: z.string().max(100).optional(),
+  // 描述（可选）
   description: z.string().optional(),
-  // 必须提供激活码或机器人ID之一
-  activationCode: z.string().optional(),
-  robotId: z.string().optional(),
-}).refine(
-  (data) => data.activationCode || data.robotId,
-  { message: "必须提供激活码或机器人ID" }
-).refine(
-  (data) => !(data.activationCode && data.robotId),
-  { message: "只能提供激活码或机器人ID之一" }
-);
+});
 
 /**
- * 生成botId：20位随机数字大小英文字母
+ * 获取用户的机器人列表
+ * GET /api/robots
  */
-function generateBotId(): string {
-  const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const randomValues = randomBytes(20);
-  let result = '';
-  for (let i = 0; i < 20; i++) {
-    result += chars[randomValues[i] % chars.length];
+export async function GET(request: NextRequest) {
+  const client = await pool.connect();
+  try {
+    const user = requireAuth(request);
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const offset = (page - 1) * limit;
+    const status = searchParams.get("status");
+
+    // 构建查询条件
+    const conditions: string[] = ["ur.user_id = $1"];
+    const params: any[] = [user.userId];
+    let paramIndex = 2;
+
+    if (status) {
+      conditions.push(`r.status = $${paramIndex++}`);
+      params.push(status);
+    }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+    // 查询机器人总数
+    const countResult = await client.query(
+      `SELECT COUNT(*) as total
+       FROM user_robots ur
+       JOIN robots r ON ur.robot_id = r.bot_id
+       ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].total);
+
+    // 查询机器人列表
+    const query = `
+      SELECT
+        r.*,
+        ur.nickname as user_nickname,
+        ur.created_at as bound_at
+      FROM robots r
+      JOIN user_robots ur ON r.bot_id = ur.robot_id
+      ${whereClause}
+      ORDER BY ur.created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+
+    params.push(limit, offset);
+    const result = await client.query(query, params);
+
+    return NextResponse.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error("获取机器人列表错误:", error);
+
+    if (error.message && error.message.includes("未授权")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, error: "获取机器人列表失败", details: error.message },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
   }
-  return result;
 }
 
 /**
- * 创建机器人（绑定机器人到用户）
+ * 绑定机器人到用户账户
  * POST /api/robots
+ *
+ * 用户通过机器人ID绑定已存在的机器人到自己的账户
+ * 注意：不使用激活码，激活码只能由APP端使用
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
@@ -47,194 +113,244 @@ export async function POST(request: NextRequest) {
     const user = requireAuth(request);
 
     const body = await request.json();
-    const validatedData = createRobotSchema.parse(body);
+    const validatedData = bindRobotSchema.parse(body);
 
-    console.log('创建机器人请求:', validatedData);
+    console.log('绑定机器人请求:', {
+      userId: user.userId,
+      robotId: validatedData.robotId,
+      name: validatedData.name,
+    });
 
-    // 验证激活码或机器人ID
-    let sourceRobotId = null;
+    // 验证机器人是否存在
+    const robotResult = await client.query(
+      `SELECT * FROM robots WHERE bot_id = $1`,
+      [validatedData.robotId]
+    );
 
-    if (validatedData.activationCode) {
-      // 验证激活码
-      const codeResult = await client.query(
-        `SELECT * FROM activation_codes
-         WHERE code = $1
-         LIMIT 1`,
-        [validatedData.activationCode.toUpperCase()]
+    if (robotResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "指定的机器人不存在" },
+        { status: 404 }
       );
-
-      if (codeResult.rows.length === 0) {
-        return NextResponse.json(
-          { success: false, error: "激活码不存在" },
-          { status: 400 }
-        );
-      }
-
-      const code = codeResult.rows[0];
-
-      // 检查激活码状态
-      if (code.status === 'used' || code.status === 'disabled') {
-        return NextResponse.json(
-          { success: false, error: "激活码已被使用或已禁用" },
-          { status: 400 }
-        );
-      }
-
-      if (code.status === 'expired') {
-        return NextResponse.json(
-          { success: false, error: "激活码已过期" },
-          { status: 400 }
-        );
-      }
-
-      // 检查激活码是否过期
-      if (code.expires_at && new Date() > new Date(code.expires_at)) {
-        await client.query(
-          `UPDATE activation_codes SET status = 'expired' WHERE id = $1`,
-          [code.id]
-        );
-
-        return NextResponse.json(
-          { success: false, error: "激活码已过期" },
-          { status: 400 }
-        );
-      }
-
-      // 如果激活码已绑定机器人，使用绑定的机器人ID
-      if (code.robot_id) {
-        sourceRobotId = code.robot_id;
-      } else {
-        // 激活码未绑定机器人，自动创建一个新机器人作为源机器人
-        const botId = generateBotId();
-        const now = new Date();
-
-        const newBotResult = await client.query(
-          `INSERT INTO robots (
-            bot_id, name, description, status, created_by, created_at, updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          RETURNING *`,
-          [
-            botId,
-            '新机器人',
-            '通过激活码自动创建',
-            'offline',
-            code.created_by || 1,
-            now.toISOString(),
-            now.toISOString(),
-          ]
-        );
-
-        sourceRobotId = botId;
-
-        // 更新激活码，绑定到新创建的机器人
-        await client.query(
-          `UPDATE activation_codes SET robot_id = $1 WHERE id = $2`,
-          [botId, code.id]
-        );
-      }
-
-      // 标记激活码为已使用
-      await client.query(
-        `UPDATE activation_codes
-         SET status = 'used', used_count = used_count + 1
-         WHERE id = $1`,
-        [code.id]
-      );
-    } else if (validatedData.robotId) {
-      // 验证机器人ID
-      const robotResult = await client.query(
-        `SELECT * FROM robots WHERE bot_id = $1 LIMIT 1`,
-        [validatedData.robotId]
-      );
-
-      if (robotResult.rows.length === 0) {
-        return NextResponse.json(
-          { success: false, error: "机器人ID不存在" },
-          { status: 400 }
-        );
-      }
-
-      sourceRobotId = validatedData.robotId;
     }
 
-    if (!sourceRobotId) {
+    const robot = robotResult.rows[0];
+
+    // 检查用户是否已绑定该机器人
+    const existingBinding = await client.query(
+      `SELECT * FROM user_robots WHERE user_id = $1 AND robot_id = $2`,
+      [user.userId, robot.bot_id]
+    );
+
+    if (existingBinding.rows.length > 0) {
       return NextResponse.json(
-        { success: false, error: "无法确定机器人ID" },
+        { success: false, error: "您已绑定该机器人" },
         { status: 400 }
       );
     }
 
-    // 开始事务
-    await client.query('BEGIN');
+    // 绑定机器人到用户
+    const now = new Date();
+    await client.query(
+      `INSERT INTO user_robots (user_id, robot_id, nickname, created_at)
+       VALUES ($1, $2, $3, $4)`,
+      [
+        user.userId,
+        robot.bot_id,
+        validatedData.name || robot.name, // 使用自定义名称或机器人原始名称
+        now.toISOString(),
+      ]
+    );
 
-    try {
-      const now = new Date();
+    // 创建激活记录（记录绑定行为）
+    await client.query(
+      `INSERT INTO activation_records (user_id, robot_id, activated_at, activated_by, source)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user.userId, robot.bot_id, now.toISOString(), user.userId, 'web']
+    );
 
-      // 为用户创建一个新的机器人记录，使用相同的bot_id（但这会违反唯一约束）
-      // 所以实际上应该是：用户添加机器人到列表，而不是创建新机器人
-      // 但当前的schema设计是bot_id唯一，所以我们需要使用robot_members表
-      
-      // 由于robot_members表结构不明确，我们采用简单的方式：
-      // 创建一个新的机器人记录，bot_id是唯一的（通过添加用户ID后缀）
-      const userBotId = `${sourceRobotId}_u${user.userId}`;
-      
-      // 创建用户机器人记录
-      const newRobotResult = await client.query(
-        `INSERT INTO robots (
-          bot_id, name, description, status, created_by, created_at, updated_at,
-          robot_uuid
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *`,
-        [
-          userBotId,
-          validatedData.name || '未命名机器人',
-          validatedData.description || null,
-          'offline',
-          user.userId,
-          now.toISOString(),
-          now.toISOString(),
-          sourceRobotId, // 使用robot_uuid字段存储源机器人ID
-        ]
-      );
-
-      const newRobot = newRobotResult.rows[0];
-
-      // 添加兼容字段
-      const robotWithCompatFields = {
-        ...newRobot,
-        robot_id: newRobot.bot_id,
-        robot_uuid: newRobot.robot_uuid,
-        user_id: newRobot.created_by,
-        source_robot_id: sourceRobotId,
-      };
-
-      console.log('机器人绑定成功:', robotWithCompatFields);
-
-      // 提交事务
-      await client.query('COMMIT');
-
-      return NextResponse.json({
-        success: true,
-        data: robotWithCompatFields,
-        message: "机器人绑定成功",
-      });
-    } catch (error) {
-      // 回滚事务
-      await client.query('ROLLBACK');
-      throw error;
-    }
+    return NextResponse.json({
+      success: true,
+      data: {
+        robotId: robot.bot_id,
+        name: robot.name,
+        nickname: validatedData.name || robot.name,
+        status: robot.status,
+        description: robot.description,
+        message: "绑定机器人成功",
+      },
+    });
   } catch (error: any) {
-    console.error("创建机器人错误:", error);
+    console.error("绑定机器人错误:", error);
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: "请求参数错误", details: error.errors },
         { status: 400 }
       );
     }
+
+    if (error.message && error.message.includes("未授权")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, error: "绑定机器人失败", details: error.message },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * 更新机器人信息
+ * PUT /api/robots/:id
+ */
+export async function PUT(request: NextRequest) {
+  const client = await pool.connect();
+  try {
+    const user = requireAuth(request);
+
+    const { searchParams } = new URL(request.url);
+    const robotId = searchParams.get("id");
+
+    if (!robotId) {
+      return NextResponse.json(
+        { success: false, error: "缺少机器人ID" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { name, description, nickname } = body;
+
+    // 检查用户是否绑定了该机器人
+    const binding = await client.query(
+      `SELECT * FROM user_robots WHERE user_id = $1 AND robot_id = $2`,
+      [user.userId, robotId]
+    );
+
+    if (binding.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "您未绑定该机器人" },
+        { status: 403 }
+      );
+    }
+
+    // 更新机器人信息（只有管理员可以更新机器人本身的名称和描述）
+    // 普通用户只能更新自己的昵称
+    if (user.role === 'admin') {
+      const updates: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (name !== undefined) {
+        updates.push(`name = $${paramIndex++}`);
+        params.push(name);
+      }
+      if (description !== undefined) {
+        updates.push(`description = $${paramIndex++}`);
+        params.push(description);
+      }
+
+      if (updates.length > 0) {
+        params.push(new Date().toISOString(), robotId);
+        await client.query(
+          `UPDATE robots SET ${updates.join(', ')}, updated_at = $${paramIndex++} WHERE bot_id = $${paramIndex}`,
+          params
+        );
+      }
+    }
+
+    // 更新用户的昵称
+    if (nickname !== undefined) {
+      await client.query(
+        `UPDATE user_robots SET nickname = $1 WHERE user_id = $2 AND robot_id = $3`,
+        [nickname, user.userId, robotId]
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "更新成功",
+    });
+  } catch (error: any) {
+    console.error("更新机器人错误:", error);
+
+    if (error.message && error.message.includes("未授权")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, error: "更新机器人失败", details: error.message },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * 解绑机器人
+ * DELETE /api/robots/:id
+ */
+export async function DELETE(request: NextRequest) {
+  const client = await pool.connect();
+  try {
+    const user = requireAuth(request);
+
+    const { searchParams } = new URL(request.url);
+    const robotId = searchParams.get("id");
+
+    if (!robotId) {
+      return NextResponse.json(
+        { success: false, error: "缺少机器人ID" },
+        { status: 400 }
+      );
+    }
+
+    // 检查用户是否绑定了该机器人
+    const binding = await client.query(
+      `SELECT * FROM user_robots WHERE user_id = $1 AND robot_id = $2`,
+      [user.userId, robotId]
+    );
+
+    if (binding.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "您未绑定该机器人" },
+        { status: 403 }
+      );
+    }
+
+    // 解绑机器人
+    await client.query(
+      `DELETE FROM user_robots WHERE user_id = $1 AND robot_id = $2`,
+      [user.userId, robotId]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "解绑成功",
+    });
+  } catch (error: any) {
+    console.error("解绑机器人错误:", error);
+
+    if (error.message && error.message.includes("未授权")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, error: "解绑机器人失败", details: error.message },
       { status: 500 }
     );
   } finally {

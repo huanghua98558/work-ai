@@ -4,10 +4,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { z } from "zod";
-import { randomBytes } from "crypto";
 
 const activateCodeSchema = z.object({
   code: z.string().min(1),
+  // 用户ID（可选，用于绑定机器人到用户）
+  userId: z.number().optional(),
 });
 
 /**
@@ -29,13 +30,23 @@ function generateToken(): string {
  * 1. 验证激活码是否有效
  * 2. 如果激活码已绑定机器人，返回该机器人
  * 3. 如果激活码未绑定机器人，自动创建一个新机器人
- * 4. 返回机器人ID和通讯码
+ * 4. 如果提供了userId，将机器人绑定到用户账户
+ * 5. 返回机器人ID和通讯码
+ *
+ * 激活码状态逻辑：
+ * - unused: 未使用过
+ * - active: 使用过但未达到最大使用次数
+ * - used: 已达到最大使用次数
+ * - expired: 已过期
+ * - disabled: 已禁用
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
   try {
     const body = await request.json();
     const validatedData = activateCodeSchema.parse(body);
+
+    console.log('激活激活码请求:', { code: validatedData.code, userId: validatedData.userId });
 
     // 查找激活码
     const codeResult = await client.query(
@@ -55,9 +66,9 @@ export async function POST(request: NextRequest) {
     const code = codeResult.rows[0];
 
     // 检查激活码状态
-    if (code.status === 'used' || code.status === 'disabled') {
+    if (code.status === 'disabled') {
       return NextResponse.json(
-        { success: false, error: "激活码已被使用或已禁用" },
+        { success: false, error: "激活码已被禁用" },
         { status: 400 }
       );
     }
@@ -112,10 +123,13 @@ export async function POST(request: NextRequest) {
     if (!robot) {
       // 生成botId：20位随机字符
       const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const randomValues = randomBytes(20);
+      const randomValues = Array.from({ length: 20 }, () => Math.floor(Math.random() * 62));
       let botId = '';
       for (let i = 0; i < 20; i++) {
-        botId += chars[randomValues[i] % chars.length];
+        const n = randomValues[i];
+        botId += n < 10 ? String.fromCharCode(48 + n) : // 0-9
+                  n < 36 ? String.fromCharCode(97 + n - 10) : // a-z
+                           String.fromCharCode(65 + n - 36); // A-Z
       }
 
       const now = new Date();
@@ -148,23 +162,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 如果提供了userId，将机器人绑定到用户
+    if (validatedData.userId) {
+      // 检查用户是否已绑定该机器人
+      const existingBinding = await client.query(
+        `SELECT * FROM user_robots WHERE user_id = $1 AND robot_id = $2`,
+        [validatedData.userId, robot.bot_id]
+      );
+
+      if (existingBinding.rows.length === 0) {
+        // 绑定机器人到用户
+        await client.query(
+          `INSERT INTO user_robots (user_id, robot_id, nickname, created_at)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            validatedData.userId,
+            robot.bot_id,
+            robot.name,
+            new Date().toISOString(),
+          ]
+        );
+      }
+    }
+
     // 生成通讯码
     const token = generateToken();
 
-    // 更新激活码状态
+    // 更新激活码状态和使用次数
     const now = new Date();
+    const newUsedCount = (code.used_count || 0) + 1;
+
+    // 计算新的状态
+    let newStatus = code.status;
+    if (newStatus === 'unused') {
+      newStatus = 'active'; // 第一次使用后变为active
+    }
+    if (code.max_uses && newUsedCount >= code.max_uses) {
+      newStatus = 'used'; // 达到最大使用次数后变为used
+    }
+
     await client.query(
       `UPDATE activation_codes
-       SET status = 'used', used_count = used_count + 1
-       WHERE id = $1`,
-      [code.id]
+       SET status = $1, used_count = $2
+       WHERE id = $3`,
+      [newStatus, newUsedCount, code.id]
     );
 
     // 创建激活记录
     await client.query(
-      `INSERT INTO activation_records (user_id, code_id, activated_at, activated_by)
-       VALUES ($1, $2, $3, $4)`,
-      [code.created_by || 1, code.id, now.toISOString(), code.created_by || 1]
+      `INSERT INTO activation_records (user_id, code_id, robot_id, activated_at, activated_by, source)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        validatedData.userId || code.created_by || 1,
+        code.id,
+        robot.bot_id,
+        now.toISOString(),
+        validatedData.userId || code.created_by || 1,
+        'app' // 标记来源为APP
+      ]
     );
 
     // 提交事务
@@ -178,6 +233,7 @@ export async function POST(request: NextRequest) {
         token: token, // 通讯码
         isNewRobot: isNewRobot,
         message: isNewRobot ? "激活成功，已自动创建新机器人" : "激活成功",
+        remainingUses: code.max_uses ? code.max_uses - newUsedCount : null,
       },
     });
   } catch (error: any) {
@@ -198,7 +254,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: "激活激活码失败", details: error.message },
+      { success: false, error: "激活失败", details: error.message },
       { status: 500 }
     );
   } finally {
