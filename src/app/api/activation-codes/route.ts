@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { activationCodes } from "@/storage/database/shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth, isAdmin } from "@/lib/auth";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -28,20 +27,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    let whereCondition: any = {};
-    if (status) {
-      whereCondition = eq(activationCodes.status, status);
-    }
+    const db = await getDatabase();
 
-    const codes = await db
-      .select()
-      .from(activationCodes)
-      .where(whereCondition)
-      .orderBy(desc(activationCodes.createdAt));
+    let codes;
+    if (status) {
+      codes = await db.execute(sql`
+        SELECT * FROM activation_codes 
+        WHERE status = ${status}
+        ORDER BY created_at DESC
+      `);
+    } else {
+      codes = await db.execute(sql`
+        SELECT * FROM activation_codes 
+        ORDER BY created_at DESC
+      `);
+    }
 
     return NextResponse.json({
       success: true,
-      data: codes,
+      data: codes.rows,
     });
   } catch (error: any) {
     console.error("获取激活码列表错误:", error);
@@ -75,18 +79,15 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + validatedData.validityPeriod);
 
-    const [newCode] = await db
-      .insert(activationCodes)
-      .values({
-        code,
-        status: "unused",
-        validityPeriod: validatedData.validityPeriod,
-        price: validatedData.price || "0.00",
-        createdBy: user.userId,
-        notes: validatedData.notes,
-        expiresAt,
-      })
-      .returning();
+    const db = await getDatabase();
+
+    const newCodeResult = await db.execute(sql`
+      INSERT INTO activation_codes (code, status, type, max_uses, used_count, remark, creator_id, expires_at)
+      VALUES (${code}, 'active', 'trial', 1, 0, ${validatedData.notes || null}, ${user.userId}, ${expiresAt.toISOString()})
+      RETURNING *
+    `);
+
+    const newCode = newCodeResult.rows[0];
 
     return NextResponse.json({
       success: true,

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -322,7 +323,7 @@ export const updateUserSchema = z.object({
   avatar: z.string().optional(),
   role: z.enum(["admin", "user"]).optional(),
   status: z.enum(["active", "disabled"]).optional(),
-  lastLoginAt: z.date().optional(),
+  lastLoginAt: z.coerce.date().optional(),
 });
 
 export const insertActivationCodeSchema = z.object({

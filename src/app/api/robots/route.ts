@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { robots } from "@/storage/database/shared/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 
 const createRobotSchema = z.object({
   name: z.string().min(1).max(100),
-  aiMode: z.enum(["builtin", "third_party"]).default("third_party"),
-  aiProvider: z.string().max(50),
-  aiModel: z.string().max(100),
-  aiApiKey: z.string(),
-  aiTemperature: z.string().or(z.number()).transform(String).default("0.7"),
-  aiMaxTokens: z.number().int().default(2000),
-  aiContextLength: z.number().int().default(10),
-  aiScenario: z.string().max(50),
-  thirdPartyCallbackUrl: z.string().url().optional().or(z.literal("")),
-  thirdPartyResultCallbackUrl: z.string().url().optional().or(z.literal("")),
-  thirdPartySecretKey: z.string().optional(),
+  bot_type: z.string().max(20).optional(),
+  app_id: z.string().optional(),
+  app_secret: z.string().optional(),
+  description: z.string().optional(),
 });
 
 // 获取机器列表
@@ -29,21 +21,26 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const whereConditions = [eq(robots.userId, user.userId)];
+    const db = await getDatabase();
 
+    let robotList;
     if (status) {
-      whereConditions.push(eq(robots.status, status));
+      robotList = await db.execute(sql`
+        SELECT * FROM robots 
+        WHERE created_by = ${user.userId} AND status = ${status}
+        ORDER BY created_at DESC
+      `);
+    } else {
+      robotList = await db.execute(sql`
+        SELECT * FROM robots 
+        WHERE created_by = ${user.userId}
+        ORDER BY created_at DESC
+      `);
     }
-
-    const robotList = await db
-      .select()
-      .from(robots)
-      .where(and(...whereConditions))
-      .orderBy(desc(robots.createdAt));
 
     return NextResponse.json({
       success: true,
-      data: robotList,
+      data: robotList.rows,
     });
   } catch (error: any) {
     console.error("获取机器列表错误:", error);
@@ -62,31 +59,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createRobotSchema.parse(body);
 
-    // 生成机器人ID和UUID
-    const robotId = `robot_${nanoid(16).toLowerCase()}`;
-    const robotUuid = nanoid(32);
+    const db = await getDatabase();
 
-    const [newRobot] = await db
-      .insert(robots)
-      .values({
-        robotId,
-        robotUuid,
-        userId: user.userId,
-        name: validatedData.name,
-        status: "offline",
-        aiMode: validatedData.aiMode,
-        aiProvider: validatedData.aiProvider || "custom",
-        aiModel: validatedData.aiModel,
-        aiApiKey: validatedData.aiApiKey,
-        aiTemperature: validatedData.aiTemperature,
-        aiMaxTokens: validatedData.aiMaxTokens,
-        aiContextLength: validatedData.aiContextLength,
-        aiScenario: validatedData.aiScenario,
-        thirdPartyCallbackUrl: validatedData.thirdPartyCallbackUrl || null,
-        thirdPartyResultCallbackUrl: validatedData.thirdPartyResultCallbackUrl || null,
-        thirdPartySecretKey: validatedData.thirdPartySecretKey || null,
-      })
-      .returning();
+    // 生成机器人ID
+    const botId = `bot_${nanoid(16).toLowerCase()}`;
+
+    const newRobotResult = await db.execute(sql`
+      INSERT INTO robots (name, description, bot_id, bot_type, app_id, app_secret, status, created_by)
+      VALUES (
+        ${validatedData.name}, 
+        ${validatedData.description || null}, 
+        ${botId},
+        ${validatedData.bot_type || 'feishu'},
+        ${validatedData.app_id || null},
+        ${validatedData.app_secret || null},
+        'active',
+        ${user.userId}
+      )
+      RETURNING *
+    `);
+
+    const newRobot = newRobotResult.rows[0];
 
     return NextResponse.json({
       success: true,

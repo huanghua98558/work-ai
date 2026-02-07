@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/storage/database/shared/schema";
-import { eq, like, desc, or } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth, isAdmin } from "@/lib/auth";
 
 // 获取用户列表
@@ -24,40 +23,53 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    let whereConditions: any[] = [];
+    const db = await getDatabase();
+
+    // 构建 WHERE 子句
+    const conditions = [];
+    const values = [];
 
     if (role) {
-      whereConditions.push(eq(users.role, role));
+      conditions.push(`role = $${values.length + 1}`);
+      values.push(role);
     }
 
     if (status) {
-      whereConditions.push(eq(users.status, status));
+      conditions.push(`status = $${values.length + 1}`);
+      values.push(status);
     }
 
     if (search) {
-      whereConditions.push(
-        or(
-          like(users.nickname, `%${search}%`),
-          like(users.phone, `%${search}%`)
-        )
-      );
+      conditions.push(`(nickname ILIKE $${values.length + 1} OR phone ILIKE $${values.length + 2})`);
+      values.push(`%${search}%`, `%${search}%`);
     }
 
-    const userList = await db
-      .select()
-      .from(users)
-      .where(whereConditions.length > 0 ? or(...whereConditions) : undefined)
-      .orderBy(desc(users.createdAt))
-      .limit(limit)
-      .offset((page - 1) * limit);
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const offset = (page - 1) * limit;
+
+    // 查询用户列表
+    const userListResult = await db.execute(sql`
+      SELECT * FROM users 
+      ${sql.raw(whereClause)}
+      ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    // 查询总数
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) as total FROM users 
+      ${sql.raw(whereClause)}
+    `);
+
+    const total = parseInt(countResult.rows[0].total);
 
     return NextResponse.json({
       success: true,
-      data: userList,
+      data: userListResult.rows,
       pagination: {
         page,
         limit,
-        total: userList.length,
+        total,
       },
     });
   } catch (error: any) {

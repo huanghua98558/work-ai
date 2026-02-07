@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/storage/database/shared/schema";
-import { eq } from "drizzle-orm";
-import { verifyPassword, hashPassword } from "@/lib/password";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { generateAccessToken, generateRefreshToken, JWTPayload } from "@/lib/jwt";
 import { z } from "zod";
 
@@ -16,20 +14,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = loginSchema.parse(body);
 
-    // 查询用户
-    const userList = await db
-      .select()
-      .from(users)
-      .where(eq(users.phone, validatedData.phone));
+    // 获取数据库实例
+    const db = await getDatabase();
 
-    if (userList.length === 0) {
+    // 查询用户
+    const userResult = await db.execute(sql`
+      SELECT id, phone, nickname, avatar, role, status 
+      FROM users 
+      WHERE phone = ${validatedData.phone}
+      LIMIT 1
+    `);
+
+    if (userResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "用户不存在" },
         { status: 401 }
       );
     }
 
-    const user = userList[0];
+    const user = userResult.rows[0];
 
     // 检查用户状态
     if (user.status !== "active") {
@@ -61,10 +64,11 @@ export async function POST(request: NextRequest) {
     const refreshToken = generateRefreshToken(payload);
 
     // 更新最后登录时间
-    await db
-      .update(users)
-      .set({ lastLoginAt: new Date() })
-      .where(eq(users.id, user.id));
+    await db.execute(sql`
+      UPDATE users 
+      SET last_login_at = NOW()
+      WHERE id = ${user.id}
+    `);
 
     return NextResponse.json({
       success: true,

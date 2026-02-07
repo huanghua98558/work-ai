@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { robots } from "@/storage/database/shared/schema";
-import { eq, and } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 
 // 启停机器人
@@ -13,44 +12,46 @@ export async function POST(
     const user = requireAuth(request);
 
     const { id } = await params;
+    const robotId = parseInt(id);
+
+    const db = await getDatabase();
 
     // 检查机器人是否属于当前用户
-    const existingRobots = await db
-      .select()
-      .from(robots)
-      .where(
-        and(
-          eq(robots.id, parseInt(id)),
-          eq(robots.userId, user.userId)
-        )
-      );
+    const existingRobotResult = await db.execute(sql`
+      SELECT * FROM robots 
+      WHERE id = ${robotId} AND created_by = ${user.userId}
+      LIMIT 1
+    `);
 
-    if (existingRobots.length === 0) {
+    if (existingRobotResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "机器人不存在" },
         { status: 404 }
       );
     }
 
-    const robot = existingRobots[0];
+    const robot = existingRobotResult.rows[0];
 
     // 切换机器人状态
-    const newStatus = robot.status === "online" ? "offline" : "online";
+    const newStatus = robot.status === "active" ? "inactive" : "active";
+    const now = new Date().toISOString();
 
-    const [updatedRobot] = await db
-      .update(robots)
-      .set({
-        status: newStatus,
-        lastActiveAt: newStatus === "online" ? new Date() : robot.lastActiveAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(robots.id, parseInt(id)))
-      .returning();
+    const updatedRobotResult = await db.execute(sql`
+      UPDATE robots 
+      SET 
+        status = ${newStatus},
+        last_active_at = ${newStatus === 'active' ? now : robot.last_active_at},
+        updated_at = ${now}
+      WHERE id = ${robotId}
+      RETURNING *
+    `);
+
+    const updatedRobot = updatedRobotResult.rows[0];
 
     return NextResponse.json({
       success: true,
       data: updatedRobot,
-      message: newStatus === "online" ? "机器人已启动" : "机器人已停止",
+      message: newStatus === "active" ? "机器人已启动" : "机器人已停止",
     });
   } catch (error: any) {
     console.error("启停机器人错误:", error);

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/storage/database/shared/schema";
-import { eq } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth, isAdmin } from "@/lib/auth";
 import { z } from "zod";
 
@@ -30,19 +29,22 @@ export async function GET(
       );
     }
 
-    const userList = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, parseInt(id)));
+    const db = await getDatabase();
 
-    if (userList.length === 0) {
+    const userResult = await db.execute(sql`
+      SELECT * FROM users 
+      WHERE id = ${parseInt(id)}
+      LIMIT 1
+    `);
+
+    if (userResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "用户不存在" },
         { status: 404 }
       );
     }
 
-    const targetUser = userList[0];
+    const targetUser = userResult.rows[0];
 
     return NextResponse.json({
       success: true,
@@ -66,9 +68,10 @@ export async function PUT(
     const user = requireAuth(request);
 
     const { id } = await params;
+    const userId = parseInt(id);
 
     // 用户只能更新自己的部分信息，管理员可以更新所有用户
-    if (!isAdmin(user) && parseInt(id) !== user.userId) {
+    if (!isAdmin(user) && userId !== user.userId) {
       return NextResponse.json(
         { success: false, error: "权限不足" },
         { status: 403 }
@@ -84,13 +87,48 @@ export async function PUT(
       delete (validatedData as any).status;
     }
 
-    const [updatedUser] = await db
-      .update(users)
-      .set(validatedData)
-      .where(eq(users.id, parseInt(id)))
-      .returning();
+    const db = await getDatabase();
 
-    if (!updatedUser) {
+    // 构建 SET 子句
+    const setClauses = [];
+    const values = [];
+
+    if (validatedData.nickname !== undefined) {
+      setClauses.push(`nickname = $${values.length + 1}`);
+      values.push(validatedData.nickname);
+    }
+    if (validatedData.avatar !== undefined) {
+      setClauses.push(`avatar = $${values.length + 1}`);
+      values.push(validatedData.avatar);
+    }
+    if (validatedData.role !== undefined) {
+      setClauses.push(`role = $${values.length + 1}`);
+      values.push(validatedData.role);
+    }
+    if (validatedData.status !== undefined) {
+      setClauses.push(`status = $${values.length + 1}`);
+      values.push(validatedData.status);
+    }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "没有提供更新字段" },
+        { status: 400 }
+      );
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+
+    const updateQuery = sql`
+      UPDATE users 
+      SET ${sql.raw(setClauses.join(", "))}
+      WHERE id = ${userId}
+      RETURNING *
+    `;
+
+    const updatedUserResult = await db.execute(updateQuery);
+
+    if (updatedUserResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "用户不存在" },
         { status: 404 }
@@ -99,7 +137,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: updatedUser,
+      data: updatedUserResult.rows[0],
     });
   } catch (error: any) {
     console.error("更新用户错误:", error);
@@ -135,22 +173,26 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    const userId = parseInt(id);
 
     // 不能删除自己
-    if (parseInt(id) === user.userId) {
+    if (userId === user.userId) {
       return NextResponse.json(
         { success: false, error: "不能删除自己" },
         { status: 400 }
       );
     }
 
-    const [deletedUser] = await db
-      .update(users)
-      .set({ status: "disabled" })
-      .where(eq(users.id, parseInt(id)))
-      .returning();
+    const db = await getDatabase();
 
-    if (!deletedUser) {
+    const deletedUserResult = await db.execute(sql`
+      UPDATE users 
+      SET status = 'disabled', updated_at = NOW()
+      WHERE id = ${userId}
+      RETURNING *
+    `);
+
+    if (deletedUserResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "用户不存在" },
         { status: 404 }

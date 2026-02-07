@@ -1,10 +1,10 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { getDb } from "coze-coding-dev-sdk";
+import * as schema from "../storage/database/shared/schema";
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/workbot';
+// 使用 coze-coding-dev-sdk 获取数据库连接（异步）
+export async function getDatabase() {
+  return getDb(schema);
+}
 
-// 创建客户端连接
-const client = postgres(connectionString);
-
-// 创建 Drizzle 实例
-export const db = drizzle(client);
+// 为了向后兼容，提供一个同步的版本（不推荐）
+export const db = getDb(schema);

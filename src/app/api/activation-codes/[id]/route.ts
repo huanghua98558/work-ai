@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { activationCodes } from "@/storage/database/shared/schema";
-import { eq } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth, isAdmin } from "@/lib/auth";
 import { z } from "zod";
 
 const updateActivationCodeSchema = z.object({
-  status: z.enum(["unused", "used", "expired", "disabled"]).optional(),
-  boundUserId: z.number().int().optional(),
+  status: z.enum(["active", "inactive", "expired", "disabled"]).optional(),
   expiresAt: z.coerce.date().optional(),
-  notes: z.string().optional(),
+  remark: z.string().optional(),
 });
 
 // 获取单个激活码详情
@@ -21,23 +19,27 @@ export async function GET(
     const user = requireAuth(request);
 
     const { id } = await params;
+    const codeId = parseInt(id);
 
-    const codes = await db
-      .select()
-      .from(activationCodes)
-      .where(eq(activationCodes.id, parseInt(id)));
+    const db = await getDatabase();
 
-    if (codes.length === 0) {
+    const codeResult = await db.execute(sql`
+      SELECT * FROM activation_codes 
+      WHERE id = ${codeId}
+      LIMIT 1
+    `);
+
+    if (codeResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "激活码不存在" },
         { status: 404 }
       );
     }
 
-    const code = codes[0];
+    const code = codeResult.rows[0];
 
-    // 只有管理员或绑定用户可以查看
-    if (!isAdmin(user) && code.boundUserId !== user.userId) {
+    // 只有管理员可以查看
+    if (!isAdmin(user)) {
       return NextResponse.json(
         { success: false, error: "权限不足" },
         { status: 403 }
@@ -74,16 +76,48 @@ export async function PUT(
     }
 
     const { id } = await params;
+    const codeId = parseInt(id);
     const body = await request.json();
     const validatedData = updateActivationCodeSchema.parse(body);
 
-    const [updatedCode] = await db
-      .update(activationCodes)
-      .set(validatedData)
-      .where(eq(activationCodes.id, parseInt(id)))
-      .returning();
+    const db = await getDatabase();
 
-    if (!updatedCode) {
+    // 构建 SET 子句
+    const setClauses = [];
+    const values = [];
+
+    if (validatedData.status !== undefined) {
+      setClauses.push(`status = $${values.length + 1}`);
+      values.push(validatedData.status);
+    }
+    if (validatedData.expiresAt !== undefined) {
+      setClauses.push(`expires_at = $${values.length + 1}`);
+      values.push(validatedData.expiresAt.toISOString());
+    }
+    if (validatedData.remark !== undefined) {
+      setClauses.push(`remark = $${values.length + 1}`);
+      values.push(validatedData.remark);
+    }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "没有提供更新字段" },
+        { status: 400 }
+      );
+    }
+
+    values.push(codeId);
+
+    const updateQuery = sql`
+      UPDATE activation_codes 
+      SET ${sql.raw(setClauses.join(", "))}, updated_at = NOW()
+      WHERE id = ${codeId}
+      RETURNING *
+    `;
+
+    const updatedCodeResult = await db.execute(updateQuery);
+
+    if (updatedCodeResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "激活码不存在" },
         { status: 404 }
@@ -92,7 +126,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: updatedCode,
+      data: updatedCodeResult.rows[0],
     });
   } catch (error: any) {
     console.error("更新激活码错误:", error);
@@ -128,13 +162,17 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    const codeId = parseInt(id);
 
-    const deletedCodes = await db
-      .delete(activationCodes)
-      .where(eq(activationCodes.id, parseInt(id)))
-      .returning();
+    const db = await getDatabase();
 
-    if (deletedCodes.length === 0) {
+    const deletedCodeResult = await db.execute(sql`
+      DELETE FROM activation_codes 
+      WHERE id = ${codeId}
+      RETURNING *
+    `);
+
+    if (deletedCodeResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "激活码不存在" },
         { status: 404 }

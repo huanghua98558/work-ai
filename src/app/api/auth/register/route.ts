@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/storage/database/shared/schema";
-import { eq } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { generateAccessToken, generateRefreshToken, JWTPayload } from "@/lib/jwt";
 import { z } from "zod";
 
@@ -16,29 +15,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = registerSchema.parse(body);
 
-    // 检查用户是否已存在
-    const existingUsers = await db
-      .select()
-      .from(users)
-      .where(eq(users.phone, validatedData.phone));
+    // 获取数据库实例
+    const db = await getDatabase();
 
-    if (existingUsers.length > 0) {
+    // 检查用户是否已存在
+    const existingUserResult = await db.execute(sql`
+      SELECT id, phone, nickname, role, status 
+      FROM users 
+      WHERE phone = ${validatedData.phone}
+      LIMIT 1
+    `);
+
+    if (existingUserResult.rows.length > 0) {
       return NextResponse.json(
         { success: false, error: "该手机号已注册" },
         { status: 400 }
       );
     }
 
-    // 创建新用户（暂时使用手机号作为密码）
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        phone: validatedData.phone,
-        nickname: validatedData.nickname || "未命名",
-        role: "user",
-        status: "active",
-      })
-      .returning();
+    // 创建新用户
+    const newUserResult = await db.execute(sql`
+      INSERT INTO users (phone, nickname, role, status)
+      VALUES (${validatedData.phone}, ${validatedData.nickname || "未命名"}, 'user', 'active')
+      RETURNING id, phone, nickname, role, status, avatar, created_at
+    `);
+
+    const newUser = newUserResult.rows[0];
 
     // 生成 JWT Token
     const payload: JWTPayload = {

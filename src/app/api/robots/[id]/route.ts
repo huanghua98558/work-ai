@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { robots } from "@/storage/database/shared/schema";
-import { eq, and } from "drizzle-orm";
+import { getDatabase } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { z } from "zod";
 
 const updateRobotSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  status: z.enum(["online", "offline", "deleted"]).optional(),
-  aiMode: z.enum(["builtin", "third_party"]).optional(),
-  aiProvider: z.string().max(50).optional(),
-  aiModel: z.string().max(100).optional(),
-  aiApiKey: z.string().optional(),
-  aiTemperature: z.string().or(z.number()).transform(String).optional(),
-  aiMaxTokens: z.number().int().optional(),
-  aiContextLength: z.number().int().optional(),
-  aiScenario: z.string().max(50).optional(),
-  thirdPartyCallbackUrl: z.string().url().optional().or(z.literal("")),
-  thirdPartyResultCallbackUrl: z.string().url().optional().or(z.literal("")),
-  thirdPartySecretKey: z.string().optional(),
+  status: z.enum(["active", "inactive", "deleted"]).optional(),
+  description: z.string().optional(),
+  bot_type: z.string().max(20).optional(),
+  app_id: z.string().optional(),
+  app_secret: z.string().optional(),
+  bot_token: z.string().optional(),
+  bot_secret: z.string().optional(),
+  encrypt_key: z.string().optional(),
+  verification_token: z.string().optional(),
 });
 
 // 获取机器人详情
@@ -30,25 +26,24 @@ export async function GET(
     const user = requireAuth(request);
 
     const { id } = await params;
+    const robotId = parseInt(id);
 
-    const robotList = await db
-      .select()
-      .from(robots)
-      .where(
-        and(
-          eq(robots.id, parseInt(id)),
-          eq(robots.userId, user.userId)
-        )
-      );
+    const db = await getDatabase();
 
-    if (robotList.length === 0) {
+    const robotResult = await db.execute(sql`
+      SELECT * FROM robots 
+      WHERE id = ${robotId} AND created_by = ${user.userId}
+      LIMIT 1
+    `);
+
+    if (robotResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "机器人不存在" },
         { status: 404 }
       );
     }
 
-    const robot = robotList[0];
+    const robot = robotResult.rows[0];
 
     return NextResponse.json({
       success: true,
@@ -72,19 +67,18 @@ export async function PUT(
     const user = requireAuth(request);
 
     const { id } = await params;
+    const robotId = parseInt(id);
+
+    const db = await getDatabase();
 
     // 检查机器人是否属于当前用户
-    const existingRobots = await db
-      .select()
-      .from(robots)
-      .where(
-        and(
-          eq(robots.id, parseInt(id)),
-          eq(robots.userId, user.userId)
-        )
-      );
+    const existingRobotResult = await db.execute(sql`
+      SELECT * FROM robots 
+      WHERE id = ${robotId} AND created_by = ${user.userId}
+      LIMIT 1
+    `);
 
-    if (existingRobots.length === 0) {
+    if (existingRobotResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "机器人不存在" },
         { status: 404 }
@@ -94,18 +88,72 @@ export async function PUT(
     const body = await request.json();
     const validatedData = updateRobotSchema.parse(body);
 
-    const [updatedRobot] = await db
-      .update(robots)
-      .set({
-        ...validatedData,
-        updatedAt: new Date(),
-      })
-      .where(eq(robots.id, parseInt(id)))
-      .returning();
+    // 构建 SET 子句
+    const setClauses = [];
+    const values = [];
+
+    if (validatedData.name !== undefined) {
+      setClauses.push(`name = $${values.length + 1}`);
+      values.push(validatedData.name);
+    }
+    if (validatedData.status !== undefined) {
+      setClauses.push(`status = $${values.length + 1}`);
+      values.push(validatedData.status);
+    }
+    if (validatedData.description !== undefined) {
+      setClauses.push(`description = $${values.length + 1}`);
+      values.push(validatedData.description);
+    }
+    if (validatedData.bot_type !== undefined) {
+      setClauses.push(`bot_type = $${values.length + 1}`);
+      values.push(validatedData.bot_type);
+    }
+    if (validatedData.app_id !== undefined) {
+      setClauses.push(`app_id = $${values.length + 1}`);
+      values.push(validatedData.app_id);
+    }
+    if (validatedData.app_secret !== undefined) {
+      setClauses.push(`app_secret = $${values.length + 1}`);
+      values.push(validatedData.app_secret);
+    }
+    if (validatedData.bot_token !== undefined) {
+      setClauses.push(`bot_token = $${values.length + 1}`);
+      values.push(validatedData.bot_token);
+    }
+    if (validatedData.bot_secret !== undefined) {
+      setClauses.push(`bot_secret = $${values.length + 1}`);
+      values.push(validatedData.bot_secret);
+    }
+    if (validatedData.encrypt_key !== undefined) {
+      setClauses.push(`encrypt_key = $${values.length + 1}`);
+      values.push(validatedData.encrypt_key);
+    }
+    if (validatedData.verification_token !== undefined) {
+      setClauses.push(`verification_token = $${values.length + 1}`);
+      values.push(validatedData.verification_token);
+    }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "没有提供更新字段" },
+        { status: 400 }
+      );
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+
+    const updateQuery = sql`
+      UPDATE robots 
+      SET ${sql.raw(setClauses.join(", "))}
+      WHERE id = ${robotId}
+      RETURNING *
+    `;
+
+    const updatedRobotResult = await db.execute(updateQuery);
 
     return NextResponse.json({
       success: true,
-      data: updatedRobot,
+      data: updatedRobotResult.rows[0],
     });
   } catch (error: any) {
     console.error("更新机器人错误:", error);
@@ -133,19 +181,18 @@ export async function DELETE(
     const user = requireAuth(request);
 
     const { id } = await params;
+    const robotId = parseInt(id);
+
+    const db = await getDatabase();
 
     // 检查机器人是否属于当前用户
-    const existingRobots = await db
-      .select()
-      .from(robots)
-      .where(
-        and(
-          eq(robots.id, parseInt(id)),
-          eq(robots.userId, user.userId)
-        )
-      );
+    const existingRobotResult = await db.execute(sql`
+      SELECT * FROM robots 
+      WHERE id = ${robotId} AND created_by = ${user.userId}
+      LIMIT 1
+    `);
 
-    if (existingRobots.length === 0) {
+    if (existingRobotResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "机器人不存在" },
         { status: 404 }
@@ -153,15 +200,12 @@ export async function DELETE(
     }
 
     // 软删除机器人
-    const [deletedRobot] = await db
-      .update(robots)
-      .set({
-        status: "deleted",
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(robots.id, parseInt(id)))
-      .returning();
+    const deletedRobotResult = await db.execute(sql`
+      UPDATE robots 
+      SET status = 'deleted', updated_at = NOW()
+      WHERE id = ${robotId}
+      RETURNING *
+    `);
 
     return NextResponse.json({
       success: true,
