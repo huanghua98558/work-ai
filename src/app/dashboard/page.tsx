@@ -1,216 +1,103 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { MainLayout } from '@/components/layout/main-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, Key, MessageSquare, Database, Activity, Users } from 'lucide-react';
-
-interface Stats {
-  totalRobots: number;
-  activeRobots: number;
-  totalActivationCodes: number;
-  usedActivationCodes: number;
-  totalMessages: number;
-  totalSessions: number;
-  knowledgeBaseSize: number;
-  onlineUsers: number;
-}
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats>({
-    totalRobots: 0,
-    activeRobots: 0,
-    totalActivationCodes: 0,
-    usedActivationCodes: 0,
-    totalMessages: 0,
-    totalSessions: 0,
-    knowledgeBaseSize: 0,
-    onlineUsers: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const router = useRouter()
 
   useEffect(() => {
-    // TODO: 从 API 获取统计数据
-    // 这里先使用模拟数据
-    setTimeout(() => {
-      setStats({
-        totalRobots: 12,
-        activeRobots: 8,
-        totalActivationCodes: 50,
-        usedActivationCodes: 32,
-        totalMessages: 1250,
-        totalSessions: 380,
-        knowledgeBaseSize: 156,
-        onlineUsers: 24,
-      });
-      setLoading(false);
-    }, 500);
-  }, []);
+    // 检查是否已登录
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
 
-  const statCards = [
-    {
-      title: '机器人总数',
-      value: stats.totalRobots,
-      active: stats.activeRobots,
-      icon: Bot,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-    },
-    {
-      title: '激活码',
-      value: stats.totalActivationCodes,
-      subtitle: `已使用 ${stats.usedActivationCodes}`,
-      icon: Key,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-    },
-    {
-      title: '消息总数',
-      value: stats.totalMessages,
-      icon: MessageSquare,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-    },
-    {
-      title: '会话数',
-      value: stats.totalSessions,
-      icon: Users,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-    },
-    {
-      title: '知识库',
-      value: stats.knowledgeBaseSize,
-      icon: Database,
-      color: 'text-cyan-600',
-      bgColor: 'bg-cyan-50',
-    },
-    {
-      title: '在线用户',
-      value: stats.onlineUsers,
-      icon: Activity,
-      color: 'text-pink-600',
-      bgColor: 'bg-pink-50',
-    },
-  ];
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    router.push('/')
+  }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">仪表盘</h1>
-          <p className="text-slate-500">欢迎使用 WorkBot 管理系统</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <nav className="bg-white dark:bg-gray-800 shadow">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            WorkBot 控制台
+          </h1>
+          <Button onClick={handleLogout} variant="outline">
+            退出登录
+          </Button>
+        </div>
+      </nav>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            欢迎回来！
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            开始管理您的企业微信机器人
+          </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {statCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <Card key={card.title}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {card.title}
-                  </CardTitle>
-                  <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                    <Icon className={`h-4 w-4 ${card.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{card.value}</div>
-                  {card.subtitle && (
-                    <p className="text-xs text-slate-500">{card.subtitle}</p>
-                  )}
-                  {card.active !== undefined && (
-                    <p className="text-xs text-slate-500">
-                      活跃 {card.active} 个
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="text-4xl font-bold text-blue-600 mb-2">0</div>
+            <div className="text-gray-600 dark:text-gray-300">机器人数量</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="text-4xl font-bold text-green-600 mb-2">0</div>
+            <div className="text-gray-600 dark:text-gray-300">激活码数量</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="text-4xl font-bold text-purple-600 mb-2">0</div>
+            <div className="text-gray-600 dark:text-gray-300">对话数量</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="text-4xl font-bold text-orange-600 mb-2">0</div>
+            <div className="text-gray-600 dark:text-gray-300">消息数量</div>
+          </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>快捷操作</CardTitle>
-              <CardDescription>常用功能快速入口</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <a
-                href="/activation-codes"
-                className="flex items-center justify-between rounded-lg border p-4 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Key className="h-5 w-5 text-purple-600" />
-                  <span>创建激活码</span>
-                </div>
-                <span className="text-slate-400">→</span>
-              </a>
-              <a
-                href="/robots"
-                className="flex items-center justify-between rounded-lg border p-4 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Bot className="h-5 w-5 text-blue-600" />
-                  <span>添加机器人</span>
-                </div>
-                <span className="text-slate-400">→</span>
-              </a>
-              <a
-                href="/knowledge"
-                className="flex items-center justify-between rounded-lg border p-4 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Database className="h-5 w-5 text-cyan-600" />
-                  <span>添加知识库内容</span>
-                </div>
-                <span className="text-slate-400">→</span>
-              </a>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>系统状态</CardTitle>
-              <CardDescription>实时系统运行状态</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">服务状态</span>
-                <span className="flex items-center gap-2 text-sm font-medium text-green-600">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  运行中
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">数据库连接</span>
-                <span className="flex items-center gap-2 text-sm font-medium text-green-600">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  正常
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">AI 服务</span>
-                <span className="flex items-center gap-2 text-sm font-medium text-green-600">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  可用
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">WebSocket</span>
-                <span className="flex items-center gap-2 text-sm font-medium text-green-600">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  连接正常
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            快速操作
+          </h3>
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                创建机器人
+              </h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                配置新的企业微信机器人，支持多种 AI 模型
+              </p>
+              <Button size="sm">创建机器人</Button>
+            </div>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">
+                管理激活码
+              </h4>
+              <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                生成和管理激活码，支持批量操作
+              </p>
+              <Button size="sm" variant="outline">管理激活码</Button>
+            </div>
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">
+                查看统计数据
+              </h4>
+              <p className="text-sm text-purple-700 dark:text-purple-300 mb-2">
+                查看机器人的使用情况和统计数据
+              </p>
+              <Button size="sm" variant="outline">查看统计</Button>
+            </div>
+          </div>
         </div>
       </div>
-    </MainLayout>
-  );
+    </div>
+  )
 }
