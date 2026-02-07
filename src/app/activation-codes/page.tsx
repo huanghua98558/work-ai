@@ -6,6 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Key,
   Plus,
@@ -17,68 +35,276 @@ import {
   RefreshCw,
   Shield,
   Zap,
+  Trash2,
+  Edit,
+  Eye,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface ActivationCode {
   id: number;
   code: string;
+  robot_id?: string | null;
+  robot_name?: string | null;
   status: 'unused' | 'used' | 'expired' | 'disabled';
-  validityPeriod: number;
-  boundUserId: number | null;
-  price: string;
-  createdAt: string;
-  expiresAt: string;
-  usedAt: string | null;
+  validity_period: number;
+  bound_user_id: number | null;
+  price?: string;
+  created_by?: number;
+  created_at: string;
+  expires_at: string;
+  used_at?: string | null;
+  type?: string;
+  max_uses?: number;
+  used_count?: number;
+  notes?: string;
+  device_id?: string | null;
+  device_info?: any;
+}
+
+interface Robot {
+  id: number;
+  robot_id: string;
+  name: string;
+  status: string;
 }
 
 export default function ActivationCodesPage() {
   const [codes, setCodes] = useState<ActivationCode[]>([]);
+  const [robots, setRobots] = useState<Robot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // 生成激活码弹窗
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [bindMode, setBindMode] = useState<'existing' | 'new'>('new');
+  const [selectedRobotId, setSelectedRobotId] = useState('');
+  const [robotName, setRobotName] = useState('');
+  const [validityPeriod, setValidityPeriod] = useState('365');
+  const [notes, setNotes] = useState('');
+  
+  // 编辑激活码弹窗
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCode, setEditingCode] = useState<ActivationCode | null>(null);
+  
+  // 查看详情弹窗
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [viewingCode, setViewingCode] = useState<ActivationCode | null>(null);
+
+  // 加载数据
+  const loadData = async () => {
+    try {
+      const [codesRes, robotsRes] = await Promise.all([
+        fetch('/api/activation-codes'),
+        fetch('/api/robots'),
+      ]);
+      
+      const codesData = await codesRes.json();
+      const robotsData = await robotsRes.json();
+      
+      if (codesData.success) {
+        setCodes(codesData.data);
+      }
+      if (robotsData.success) {
+        setRobots(robotsData.data);
+      }
+    } catch (error) {
+      console.error('加载数据失败:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    // 模拟数据加载
-    const mockCodes: ActivationCode[] = [
-      {
-        id: 1,
-        code: 'ABCD1234',
-        status: 'unused',
-        validityPeriod: 365,
-        boundUserId: null,
-        price: '99.00',
-        createdAt: '2024-02-01',
-        expiresAt: '2025-02-01',
-        usedAt: null,
-      },
-      {
-        id: 2,
-        code: 'EFGH5678',
-        status: 'used',
-        validityPeriod: 365,
-        boundUserId: 101,
-        price: '99.00',
-        createdAt: '2024-01-20',
-        expiresAt: '2025-01-20',
-        usedAt: '2024-01-25',
-      },
-      {
-        id: 3,
-        code: 'IJKL9012',
-        status: 'unused',
-        validityPeriod: 365,
-        boundUserId: null,
-        price: '99.00',
-        createdAt: '2024-02-05',
-        expiresAt: '2025-02-05',
-        usedAt: null,
-      },
-    ];
-    setCodes(mockCodes);
-    setLoading(false);
+    loadData();
   }, []);
 
+  // 刷新列表
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+  };
+
+  // 复制激活码
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     alert('已复制到剪贴板');
+  };
+
+  // 生成激活码
+  const handleCreateCode = async () => {
+    try {
+      const requestBody: any = {
+        validityPeriod: parseInt(validityPeriod),
+        notes,
+      };
+
+      if (bindMode === 'existing' && selectedRobotId) {
+        requestBody.robotId = selectedRobotId;
+      } else if (bindMode === 'new' && robotName) {
+        requestBody.robotName = robotName;
+      }
+
+      const res = await fetch('/api/activation-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert('激活码生成成功！');
+        setCreateDialogOpen(false);
+        setSelectedRobotId('');
+        setRobotName('');
+        setNotes('');
+        await loadData();
+      } else {
+        alert(`生成失败：${data.error}`);
+      }
+    } catch (error) {
+      console.error('生成激活码失败:', error);
+      alert('生成失败，请稍后重试');
+    }
+  };
+
+  // 编辑激活码
+  const handleEditCode = async () => {
+    if (!editingCode) return;
+
+    try {
+      const res = await fetch(`/api/activation-codes/${editingCode.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expiresAt: editingCode.expires_at,
+          notes: editingCode.notes,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert('更新成功！');
+        setEditDialogOpen(false);
+        setEditingCode(null);
+        await loadData();
+      } else {
+        alert(`更新失败：${data.error}`);
+      }
+    } catch (error) {
+      console.error('更新激活码失败:', error);
+      alert('更新失败，请稍后重试');
+    }
+  };
+
+  // 删除激活码
+  const handleDeleteCode = async (id: number) => {
+    if (!confirm('确定要删除此激活码吗？此操作不可恢复！')) return;
+
+    try {
+      const res = await fetch(`/api/activation-codes/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert('删除成功！');
+        await loadData();
+      } else {
+        alert(`删除失败：${data.error}`);
+      }
+    } catch (error) {
+      console.error('删除激活码失败:', error);
+      alert('删除失败，请稍后重试');
+    }
+  };
+
+  // 解绑设备
+  const handleUnbindDevice = async (code: string) => {
+    if (!confirm('确定要解绑设备吗？解绑后可以使用新设备激活。')) return;
+
+    try {
+      const res = await fetch('/api/admin/unbind-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          reason: '管理员解绑',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert('设备解绑成功！');
+        await loadData();
+      } else {
+        alert(`解绑失败：${data.error}`);
+      }
+    } catch (error) {
+      console.error('解绑设备失败:', error);
+      alert('解绑失败，请稍后重试');
+    }
+  };
+
+  // 批量导出
+  const handleExport = () => {
+    if (codes.length === 0) {
+      alert('没有可导出的激活码');
+      return;
+    }
+
+    const csvContent = [
+      ['激活码', '机器人名称', '机器人ID', '状态', '有效期', '创建时间', '过期时间', '备注'].join(','),
+      ...codes.map(code => [
+        code.code,
+        code.robot_name || '-',
+        code.robot_id || '-',
+        code.status,
+        code.validity_period + '天',
+        code.created_at,
+        code.expires_at,
+        code.notes || '-',
+      ].join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `activation_codes_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  // 查看详情
+  const handleViewDetail = (code: ActivationCode) => {
+    setViewingCode(code);
+    setDetailDialogOpen(true);
+  };
+
+  // 编辑
+  const handleEditClick = (code: ActivationCode) => {
+    setEditingCode(code);
+    setEditDialogOpen(true);
+  };
+
+  // 状态文本
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'unused':
+        return '未使用';
+      case 'used':
+        return '已使用';
+      case 'expired':
+        return '已过期';
+      case 'disabled':
+        return '已禁用';
+      default:
+        return status;
+    }
   };
 
   if (loading) {
@@ -106,17 +332,27 @@ export default function ActivationCodesPage() {
             <p className="text-xl text-green-100 mb-6 max-w-2xl">
               生成和管理激活码，支持批量生成和导出功能
             </p>
-            <div className="flex gap-3">
-              <Button className="bg-white text-green-600 hover:bg-green-50">
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                className="bg-white text-green-600 hover:bg-green-50"
+                onClick={() => setCreateDialogOpen(true)}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 生成新激活码
               </Button>
-              <Button className="bg-white/10 text-white border-white/50 hover:bg-white/20">
+              <Button 
+                className="bg-white/10 text-white border-white/50 hover:bg-white/20"
+                onClick={handleExport}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 批量导出
               </Button>
-              <Button className="bg-white/10 text-white border-white/50 hover:bg-white/20">
-                <RefreshCw className="mr-2 h-4 w-4" />
+              <Button 
+                className="bg-white/10 text-white border-white/50 hover:bg-white/20"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 刷新列表
               </Button>
             </div>
@@ -168,7 +404,9 @@ export default function ActivationCodesPage() {
               <Zap className="h-4 w-4 text-orange-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">¥{codes.length * 99}</div>
+              <div className="text-3xl font-bold">
+                ¥{codes.reduce((sum, c) => sum + (parseFloat(c.price || '0') || 0), 0).toFixed(2)}
+              </div>
               <p className="text-sm text-orange-100 mt-1">总价值</p>
             </CardContent>
           </Card>
@@ -189,12 +427,12 @@ export default function ActivationCodesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>激活码</TableHead>
+                    <TableHead>机器人名称</TableHead>
+                    <TableHead>机器人ID</TableHead>
+                    <TableHead>设备ID</TableHead>
                     <TableHead>状态</TableHead>
                     <TableHead>有效期</TableHead>
-                    <TableHead>价格</TableHead>
                     <TableHead>创建时间</TableHead>
-                    <TableHead>过期时间</TableHead>
-                    <TableHead>使用时间</TableHead>
                     <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -217,6 +455,23 @@ export default function ActivationCodesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        {code.robot_name || <span className="text-gray-400">-</span>}
+                      </TableCell>
+                      <TableCell>
+                        {code.robot_id ? (
+                          <code className="text-xs">{code.robot_id}</code>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {code.device_id ? (
+                          <code className="text-xs">{code.device_id}</code>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           variant={
                             code.status === 'unused'
@@ -236,34 +491,63 @@ export default function ActivationCodesPage() {
                               <CheckCircle2 className="h-3 w-3" />
                               已使用
                             </span>
-                          ) : (
+                          ) : code.status === 'expired' ? (
                             <span className="flex items-center gap-1">
                               <XCircle className="h-3 w-3" />
                               已过期
                             </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              已禁用
+                            </span>
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell>{code.validityPeriod} 天</TableCell>
-                      <TableCell>¥{code.price}</TableCell>
-                      <TableCell>{code.createdAt}</TableCell>
+                      <TableCell>{code.validity_period} 天</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
                           <Clock className="h-4 w-4" />
-                          {code.expiresAt}
+                          {new Date(code.created_at).toLocaleDateString()}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {code.usedAt ? (
-                          <span className="text-gray-600 dark:text-gray-400">{code.usedAt}</span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" className="text-green-600">
-                          详情
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetail(code)}
+                            className="text-green-600"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {code.status === 'used' && code.device_id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUnbindDevice(code.code)}
+                              className="text-orange-600"
+                            >
+                              解绑
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(code)}
+                            className="text-blue-600"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCode(code.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -273,6 +557,232 @@ export default function ActivationCodesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 生成激活码弹窗 */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>生成新激活码</DialogTitle>
+            <DialogDescription>
+              生成激活码并绑定到机器人
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>选择绑定方式</Label>
+              <Select value={bindMode} onValueChange={(v: 'existing' | 'new') => setBindMode(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择绑定方式" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">创建新机器人</SelectItem>
+                  <SelectItem value="existing">绑定已存在的机器人</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bindMode === 'existing' ? (
+              <div className="space-y-2">
+                <Label>选择机器人</Label>
+                <Select value={selectedRobotId} onValueChange={setSelectedRobotId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择机器人" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {robots.map(robot => (
+                      <SelectItem key={robot.robot_id} value={robot.robot_id}>
+                        {robot.name} ({robot.robot_id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>机器人名称</Label>
+                <Input
+                  placeholder="请输入机器人名称"
+                  value={robotName}
+                  onChange={(e) => setRobotName(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>有效期</Label>
+              <Select value={validityPeriod} onValueChange={setValidityPeriod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择有效期" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">1个月</SelectItem>
+                  <SelectItem value="180">6个月</SelectItem>
+                  <SelectItem value="365">1年</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>备注（可选）</Label>
+              <Textarea
+                placeholder="请输入备注信息"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreateCode} disabled={loading}>
+              {loading ? '生成中...' : '生成激活码'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑激活码弹窗 */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>编辑激活码</DialogTitle>
+            <DialogDescription>
+              修改激活码信息
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>激活码</Label>
+              <Input value={editingCode?.code || ''} disabled />
+            </div>
+
+            <div className="space-y-2">
+              <Label>过期时间</Label>
+              <Input
+                type="datetime-local"
+                value={editingCode?.expires_at ? editingCode.expires_at.slice(0, 16) : ''}
+                onChange={(e) => setEditingCode({ ...editingCode!, expires_at: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>备注</Label>
+              <Textarea
+                placeholder="请输入备注信息"
+                value={editingCode?.notes || ''}
+                onChange={(e) => setEditingCode({ ...editingCode!, notes: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleEditCode} disabled={loading}>
+              {loading ? '更新中...' : '更新'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 查看详情弹窗 */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>激活码详情</DialogTitle>
+            <DialogDescription>
+              查看激活码的完整信息
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-gray-500">激活码</Label>
+                <div className="flex items-center gap-2">
+                  <code className="text-lg font-bold">{viewingCode?.code}</code>
+                  <Button variant="ghost" size="sm" onClick={() => copyCode(viewingCode!.code)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">状态</Label>
+                <Badge>{getStatusText(viewingCode?.status || '')}</Badge>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">机器人名称</Label>
+                <div>{viewingCode?.robot_name || '-'}</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">机器人ID</Label>
+                <code className="text-xs break-all">{viewingCode?.robot_id || '-'}</code>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">设备ID</Label>
+                <code className="text-xs break-all">{viewingCode?.device_id || '-'}</code>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">有效期</Label>
+                <div>{viewingCode?.validity_period} 天</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">创建时间</Label>
+                <div>{viewingCode?.created_at}</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">过期时间</Label>
+                <div>{viewingCode?.expires_at}</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">使用时间</Label>
+                <div>{viewingCode?.used_at || '-'}</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">价格</Label>
+                <div>{viewingCode?.price ? `¥${viewingCode.price}` : '-'}</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-500">使用次数</Label>
+                <div>{viewingCode?.used_count || 0} / {viewingCode?.max_uses || 1}</div>
+              </div>
+            </div>
+
+            {viewingCode?.device_info && (
+              <div className="space-y-2">
+                <Label className="text-gray-500">设备信息</Label>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-auto text-xs">
+                  {JSON.stringify(viewingCode.device_info, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-gray-500">备注</Label>
+              <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
+                {viewingCode?.notes || '无备注'}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDetailDialogOpen(false)}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
