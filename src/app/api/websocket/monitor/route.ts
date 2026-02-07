@@ -22,14 +22,22 @@ export async function GET(request: NextRequest) {
     const connectionCount = getConnectionCount();
 
     // 获取真实的连接信息
-    const robotsWithInfo = onlineRobots.map(robotId => {
-      const conn = getConnectionInfo(robotId);
-      return {
-        robotId,
-        status: 'online',
-        connectedAt: conn ? new Date(conn.connectedAt).toISOString() : new Date().toISOString(),
-      };
-    });
+    const robotsWithInfo = onlineRobots
+      .map(robotId => {
+        const conn = getConnectionInfo(robotId);
+        if (!conn) {
+          console.warn(`[WebSocket 监控] 机器人 ${robotId} 在列表中但连接信息不存在`);
+          return null;
+        }
+        const connectedAt = new Date(conn.connectedAt).toISOString();
+        console.log(`[WebSocket 监控] 机器人 ${robotId} 连接时间: ${connectedAt} (原始值: ${conn.connectedAt})`);
+        return {
+          robotId,
+          status: 'online',
+          connectedAt,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
     return Response.json({
       success: true,

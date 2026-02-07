@@ -97,14 +97,27 @@ export default function ActivationCodesPage() {
   // 加载数据
   const loadData = async () => {
     try {
+      // 检查 token 是否存在
       const token = localStorage.getItem('token');
+      console.log('[激活码管理] 开始加载数据，token 是否存在:', !!token);
+
+      if (!token) {
+        console.log('[激活码管理] Token 不存在，跳转到登录页');
+        toast({
+          title: '未登录',
+          description: '请先登录',
+          variant: 'destructive',
+        });
+        window.location.href = '/login';
+        return;
+      }
+
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      headers['Authorization'] = `Bearer ${token}`;
 
+      console.log('[激活码管理] 发起 API 请求...');
       const [codesRes, robotsRes] = await Promise.all([
         fetch('/api/activation-codes', { headers }),
         fetch('/api/robots', { headers }),
@@ -113,25 +126,19 @@ export default function ActivationCodesPage() {
       const codesData = await codesRes.json();
       const robotsData = await robotsRes.json();
 
-      console.log('加载激活码响应:', codesData);
-      console.log('加载机器人响应:', robotsData);
+      console.log('[激活码管理] 加载激活码响应状态:', codesRes.status);
+      console.log('[激活码管理] 加载激活码响应数据:', codesData);
+      console.log('[激活码管理] 加载机器人响应状态:', robotsRes.status);
+      console.log('[激活码管理] 加载机器人响应数据:', robotsData);
 
-      if (codesRes.status === 401) {
+      if (codesRes.status === 401 || robotsRes.status === 401) {
+        console.log('[激活码管理] API 返回 401，跳转到登录页');
         toast({
           title: '登录已过期',
           description: '请重新登录',
           variant: 'destructive',
         });
-        window.location.href = '/login';
-        return;
-      }
-
-      if (robotsRes.status === 401) {
-        toast({
-          title: '登录已过期',
-          description: '请重新登录',
-          variant: 'destructive',
-        });
+        localStorage.removeItem('token');
         window.location.href = '/login';
         return;
       }

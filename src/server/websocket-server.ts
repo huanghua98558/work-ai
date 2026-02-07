@@ -14,7 +14,13 @@ interface WSConnection {
   connectedAt: number;  // 添加连接时间戳
 }
 
-const connections = new Map<string, WSConnection>();
+// 使用全局变量管理连接，避免开发环境模块多次加载导致状态丢失
+let connections = new Map<string, WSConnection>();
+if (typeof global !== 'undefined' && global.__webSocketConnections) {
+  // @ts-ignore
+  connections = global.__webSocketConnections;
+  console.log('[WebSocket] 从全局变量恢复连接列表，连接数:', connections.size);
+}
 
 // 心跳间隔（毫秒）
 const HEARTBEAT_INTERVAL = 30 * 1000; // 30秒
@@ -173,6 +179,12 @@ export function initializeWebSocketServer(server: any) {
 
           connections.set(robotId, connection);
 
+          // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
+          if (typeof global !== 'undefined') {
+            // @ts-ignore
+            global.__webSocketConnections = connections;
+          }
+
           console.log(`[WebSocket] 机器人 ${robotId} 已认证并连接，当前连接数: ${connections.size}`);
 
           // 发送认证成功消息
@@ -213,6 +225,13 @@ export function initializeWebSocketServer(server: any) {
           // 处理关闭
           ws.on('close', () => {
             connections.delete(robotId);
+
+            // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
+            if (typeof global !== 'undefined') {
+              // @ts-ignore
+              global.__webSocketConnections = connections;
+            }
+
             console.log(`[WebSocket] 机器人 ${robotId} 已断开，当前连接数: ${connections.size}`);
           });
 
@@ -220,6 +239,12 @@ export function initializeWebSocketServer(server: any) {
           ws.on('error', (error) => {
             console.error(`[WebSocket] 机器人 ${robotId} 连接错误:`, error);
             connections.delete(robotId);
+
+            // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
+            if (typeof global !== 'undefined') {
+              // @ts-ignore
+              global.__webSocketConnections = connections;
+            }
           });
 
         } finally {
@@ -342,6 +367,12 @@ function startHeartbeatCheck() {
         console.log(`[WebSocket] 机器人 ${robotId} 心跳超时，断开连接`);
         conn.ws.close(1000, '心跳超时');
         connections.delete(robotId);
+
+        // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
+        if (typeof global !== 'undefined') {
+          // @ts-ignore
+          global.__webSocketConnections = connections;
+        }
       }
     });
   }, HEARTBEAT_INTERVAL);
