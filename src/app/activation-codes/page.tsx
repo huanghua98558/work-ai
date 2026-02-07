@@ -139,6 +139,10 @@ export default function ActivationCodesPage() {
 
       if (codesData.success) {
         console.log('设置激活码数据:', codesData.data);
+        console.log('激活码数据详情:');
+        codesData.data.forEach((code: any, index: number) => {
+          console.log(`[${index}] ID=${code.id}, code=${code.code}, robot_id=${code.robot_id}, robot_name=${code.robot_name}`);
+        });
         setCodes(codesData.data);
       }
       if (robotsData.success) {
