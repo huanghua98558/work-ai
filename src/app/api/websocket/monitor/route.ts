@@ -12,14 +12,19 @@ import { getOnlineRobots, getConnectionCount, getConnectionInfo, getServerStatus
  */
 export async function GET(request: NextRequest) {
   try {
+    console.log(`[WebSocket 监控 API] 开始处理请求`);
+
     // 获取服务器状态
     const serverStatus = getServerStatus();
+    console.log(`[WebSocket 监控 API] 服务器状态: ${serverStatus}`);
 
     // 获取在线机器人列表
     const onlineRobots = getOnlineRobots();
+    console.log(`[WebSocket 监控 API] 在线机器人数量: ${onlineRobots.length}`);
 
     // 获取连接数
     const connectionCount = getConnectionCount();
+    console.log(`[WebSocket 监控 API] 连接数: ${connectionCount}`);
 
     // 获取真实的连接信息
     const robotsWithInfo = onlineRobots
@@ -38,6 +43,8 @@ export async function GET(request: NextRequest) {
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    console.log(`[WebSocket 监控 API] 准备返回数据，状态: ${serverStatus}，连接数: ${connectionCount}，机器人数: ${robotsWithInfo.length}`);
 
     return Response.json({
       success: true,

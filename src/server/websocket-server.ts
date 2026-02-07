@@ -48,6 +48,14 @@ export function initializeWebSocketServer(server: any) {
   console.log('[WebSocket] Initializing WebSocket server...');
 
   try {
+    // 立即更新服务器状态为运行中
+    globalServerStatus = 'running';
+    if (typeof global !== 'undefined') {
+      // @ts-ignore
+      global.__webSocketServerStatus = 'running';
+      console.log('[WebSocket] 已设置全局服务器状态为 running');
+    }
+
     const wss = new (WebSocket as any).Server({ noServer: true });
 
     // 处理 HTTP 升级请求
@@ -444,11 +452,17 @@ export function getConnectionInfo(robotId: string): WSConnection | undefined {
 }
 
 /**
- * 获取 WebSocket 服务器状态
+ * 获取服务器状态
  */
 export function getServerStatus(): 'running' | 'stopped' {
+  // 如果状态显示 stopped 但有连接，说明服务器实际在运行
+  if (globalServerStatus === 'stopped' && connections.size > 0) {
+    console.log(`[WebSocket] 状态为 stopped 但有 ${connections.size} 个连接，修正为 running`);
+    return 'running';
+  }
+
   const status = globalServerStatus;
-  console.log(`[WebSocket] 获取服务器状态: ${status}`);
+  console.log(`[WebSocket] 获取服务器状态: ${status}，连接数: ${connections.size}`);
   return status;
 }
 

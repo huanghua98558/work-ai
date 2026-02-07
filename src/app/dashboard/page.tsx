@@ -187,13 +187,20 @@ export default function DashboardPage() {
 
       // 获取 WebSocket 数据
       try {
+        console.log('[仪表盘] 开始获取 WebSocket 数据');
         const wsResponse = await fetch('/api/websocket/monitor', { headers })
         const wsData = await wsResponse.json()
+        console.log('[仪表盘] WebSocket 响应:', wsData);
         if (wsData.success) {
+          console.log('[仪表盘] WebSocket 服务器状态:', wsData.data.serverStatus);
+          console.log('[仪表盘] WebSocket 连接数:', wsData.data.totalConnections);
+          console.log('[仪表盘] WebSocket 在线机器人数:', wsData.data.onlineRobots?.length || 0);
           setWebsocketData(wsData.data)
+        } else {
+          console.error('[仪表盘] WebSocket API 返回失败:', wsData.error);
         }
       } catch (error) {
-        console.error('获取 WebSocket 数据失败:', error)
+        console.error('[仪表盘] 获取 WebSocket 数据失败:', error)
       }
     } catch (error: any) {
       console.error('Failed to refresh data:', error)
@@ -226,6 +233,29 @@ export default function DashboardPage() {
 
     // 加载统计数据
     fetchDashboardData()
+
+    // 定期刷新 WebSocket 数据（每 5 秒）
+    const wsInterval = setInterval(async () => {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      try {
+        const wsResponse = await fetch('/api/websocket/monitor', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        const wsData = await wsResponse.json()
+        if (wsData.success) {
+          setWebsocketData(wsData.data)
+        }
+      } catch (error) {
+        console.error('[仪表盘] 定期刷新 WebSocket 数据失败:', error)
+      }
+    }, 5000)
+
+    return () => clearInterval(wsInterval)
   }, [router, fetchDashboardData])
 
   // 使用 useMemo 优化计算
