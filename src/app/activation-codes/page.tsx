@@ -96,9 +96,17 @@ export default function ActivationCodesPage() {
   // 加载数据
   const loadData = async () => {
     try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const [codesRes, robotsRes] = await Promise.all([
-        fetch('/api/activation-codes'),
-        fetch('/api/robots'),
+        fetch('/api/activation-codes', { headers }),
+        fetch('/api/robots', { headers }),
       ]);
 
       const codesData = await codesRes.json();
@@ -166,9 +174,17 @@ export default function ActivationCodesPage() {
         requestBody.robotId = selectedRobotId;
       }
 
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/activation-codes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(requestBody),
       });
 
@@ -210,9 +226,17 @@ export default function ActivationCodesPage() {
       const expiresAt = new Date(editingCode.expires_at);
       const validityPeriod = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`/api/activation-codes/${editingCode.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           validityPeriod: validityPeriod > 0 ? validityPeriod : 365, // 确保为正数
           notes: editingCode.notes,
@@ -240,8 +264,17 @@ export default function ActivationCodesPage() {
     if (!confirm('确定要删除此激活码吗？此操作不可恢复！')) return;
 
     try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`/api/activation-codes/${id}`, {
         method: 'DELETE',
+        headers,
       });
 
       const data = await res.json();
@@ -263,9 +296,17 @@ export default function ActivationCodesPage() {
     if (!confirm('确定要解绑设备吗？解绑后可以使用新设备激活。')) return;
 
     try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/admin/unbind-device', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           code,
           reason: '管理员解绑',
