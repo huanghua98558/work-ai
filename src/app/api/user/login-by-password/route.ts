@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { Pool } from 'pg';
-
-// 创建数据库连接池
-const connectionString = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
-const pool = new Pool({
-  connectionString: connectionString,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-});
+import { pool } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {

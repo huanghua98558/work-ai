@@ -251,10 +251,7 @@ function startHeartbeatCheck() {
       }
     });
 
-    // 如果没有连接，可以停止定时器
-    if (connections.size === 0) {
-      stopHeartbeatCheck();
-    }
+    // 不自动停止心跳检测，保持定时器运行以便新的连接到来时能够继续工作
   }, HEARTBEAT_INTERVAL);
 }
 
