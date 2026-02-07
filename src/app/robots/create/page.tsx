@@ -182,7 +182,7 @@ export default function CreateRobotPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  用于在后台添加机器人
+                  20位随机字符（数字、大小写字母），用于在后台添加机器人
                 </p>
               </div>
 

@@ -29,12 +29,16 @@ function generateActivationCode(): string {
 }
 
 /**
- * 生成botId：使用 bot_ 前缀
+ * 生成botId：20位随机数字大小英文字母
  */
 function generateBotId(): string {
-  const timestamp = Date.now();
-  const randomStr = randomBytes(6).toString('hex');
-  return `bot_${timestamp}_${randomStr}`;
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const randomValues = randomBytes(20);
+  let result = '';
+  for (let i = 0; i < 20; i++) {
+    result += chars[randomValues[i] % chars.length];
+  }
+  return result;
 }
 
 /**
