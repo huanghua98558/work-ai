@@ -20,6 +20,7 @@ export const users = pgTable(
     nickname: varchar("nickname", { length: 100 }).notNull().default("未命名"),
     avatar: text("avatar"),
     phone: varchar("phone", { length: 20 }).notNull().unique(),
+    passwordHash: text("password_hash"),
     role: varchar("role", { length: 20 }).notNull().default("user"), // admin, user
     status: varchar("status", { length: 20 }).notNull().default("active"), // active, disabled
     createdAt: timestamp("created_at").defaultNow(),
