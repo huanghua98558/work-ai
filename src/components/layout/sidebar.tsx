@@ -26,6 +26,7 @@ const navigation = [
   { name: '系统监控', href: '/admin/errors', icon: Activity, gradient: 'from-orange-500 to-red-600' },
   { name: '用户管理', href: '/users', icon: User, gradient: 'from-teal-500 to-green-600' },
   { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600' },
+  { name: '帮助文档', href: '/help', icon: Activity, gradient: 'from-rose-500 to-pink-600' },
 ];
 
 export function Sidebar() {

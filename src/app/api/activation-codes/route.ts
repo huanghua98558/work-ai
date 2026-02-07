@@ -138,6 +138,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("获取激活码列表错误:", error);
+
+    if (error.message && error.message.includes("未授权")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, error: "获取激活码列表失败", details: error.message },
       { status: 500 }
@@ -253,6 +261,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "请求参数错误", details: error.errors },
         { status: 400 }
+      );
+    }
+
+    if (error.message && error.message.includes("未授权")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+
+    if (error.message && error.message.includes("权限不足")) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 403 }
       );
     }
 
