@@ -189,6 +189,28 @@ export default function ActivationCodesPage() {
     try {
       setIsCreating(true);
 
+      // 验证：如果选择了绑定机器人模式，必须选择机器人
+      if (bindMode === 'existing' && !selectedRobotId) {
+        toast({
+          title: '验证失败',
+          description: '请选择要绑定的机器人',
+          variant: 'destructive',
+        });
+        setIsCreating(false);
+        return;
+      }
+
+      // 验证：批量生成时不能绑定机器人
+      if (bindMode === 'existing' && parseInt(batchCount) > 1) {
+        toast({
+          title: '验证失败',
+          description: '绑定机器人模式只能生成1个激活码',
+          variant: 'destructive',
+        });
+        setIsCreating(false);
+        return;
+      }
+
       const requestBody: any = {
         validityPeriod: parseInt(validityPeriod),
         notes,
@@ -584,6 +606,22 @@ export default function ActivationCodesPage() {
             <CardDescription>查看和管理所有激活码</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
+            {/* 帮助提示 */}
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    如何在激活码列表中看到机器人ID？
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    创建激活码时，请选择 <span className="font-semibold">"绑定机器人"</span> 模式，并选择已存在的机器人。
+                    只有绑定机器人的激活码才会显示机器人ID，纯激活码激活时才会自动创建机器人。
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -732,7 +770,9 @@ export default function ActivationCodesPage() {
           <DialogHeader>
             <DialogTitle>生成新激活码</DialogTitle>
             <DialogDescription>
-              {bindMode === 'existing' ? '绑定已有机器人的激活码' : '激活时自动创建机器人'}
+              {bindMode === 'existing' 
+                ? '绑定已有机器人（激活码列表会显示机器人ID）' 
+                : '纯激活码（激活时自动创建机器人，激活码列表机器人ID为空）'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -747,8 +787,8 @@ export default function ActivationCodesPage() {
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4" />
                       <div>
-                        <div className="font-medium">纯激活码</div>
-                        <div className="text-xs text-gray-500">激活时自动创建机器人</div>
+                        <div className="font-medium">纯激活码（默认）</div>
+                        <div className="text-xs text-gray-500">激活时自动创建机器人，列表中机器人ID为空</div>
                       </div>
                     </div>
                   </SelectItem>
@@ -757,7 +797,7 @@ export default function ActivationCodesPage() {
                       <Shield className="h-4 w-4" />
                       <div>
                         <div className="font-medium">绑定机器人</div>
-                        <div className="text-xs text-gray-500">绑定已存在的机器人</div>
+                        <div className="text-xs text-gray-500">绑定已存在的机器人，列表中会显示机器人ID</div>
                       </div>
                     </div>
                   </SelectItem>
