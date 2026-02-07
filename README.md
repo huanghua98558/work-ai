@@ -17,6 +17,7 @@
 | **[WorkBot API 接口文档](./docs/workbot_api_reference.md)** | 用户管理、激活管理、机器人管理、消息处理、第三方集成、管理员接口、WebSocket连接 |
 | **[WorkBot 第三方AI平台集成文档](./docs/workbot_third_party_integration.md)** | 系统架构、APP激活流程、消息回调、AI回复下发、安全机制、完整示例 |
 | **[激活码管理逻辑详细文档](./docs/activation_code_logic.md)** | 激活码生成规则、一码一设备机制、设备ID管理、设备变更处理 |
+| **[WorkBot 项目分析与开发计划](./docs/workbot_project_analysis_and_plan.md)** | 项目现状分析、技术栈总结、功能模块分析、十阶段开发计划、风险评估、测试计划、部署计划 |
 
 ### 辅助文档
 
@@ -90,6 +91,7 @@
 - 🔌 [API接口文档](./docs/workbot_api_reference.md) - 了解所有API接口
 - 🔗 [第三方集成](./docs/workbot_third_party_integration.md) - 学习如何集成第三方AI平台
 - 🔑 [激活码逻辑](./docs/activation_code_logic.md) - 理解激活码机制
+- 📊 [项目分析与开发计划](./docs/workbot_project_analysis_and_plan.md) - 查看完整的开发计划和时间表
 
 ### 第三方开发者
 
