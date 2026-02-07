@@ -1,81 +1,141 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { authService } from '@/lib/auth-service';
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
+  const router = useRouter();
+  const [phone, setPhone] = useState('');
+  const [smsCode, setSmsCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [countdown, setCountdown] = useState(0);
 
-  const handleSendCode = async () => {
-    // TODO: 实现发送验证码功能
-    console.log('发送验证码:', phone)
-  }
+  const handleSendSms = async () => {
+    if (!phone || phone.length !== 11) {
+      setError('请输入有效的手机号');
+      return;
+    }
 
-  const handleLogin = async () => {
-    // TODO: 实现登录功能
-    console.log('登录:', phone, code)
-  }
+    try {
+      setLoading(true);
+      setError('');
+      await authService.sendSmsCode(phone);
+      
+      // 开始倒计时
+      setCountdown(60);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message || '发送验证码失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!phone || !smsCode) {
+      setError('请填写完整信息');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      await authService.login({ phone, smsCode });
+      
+      // 登录成功，跳转到仪表盘
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || '登录失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">WorkBot 登录</CardTitle>
-          <CardDescription className="text-center">
-            使用手机号验证码登录
+          <CardTitle className="text-2xl font-bold">登录</CardTitle>
+          <CardDescription>
+            使用手机号和验证码登录 WorkBot
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">手机号</label>
-            <input
-              type="tel"
-              placeholder="请输入手机号"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">验证码</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="请输入验证码"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">手机号</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="请输入手机号"
+                value={phone}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhone(e.target.value)}
+                maxLength={11}
               />
-              <Button 
-                onClick={handleSendCode}
-                disabled={!phone}
-                variant="outline"
-              >
-                发送验证码
-              </Button>
             </div>
-          </div>
 
-          <Button 
-            onClick={handleLogin}
-            disabled={!phone || !code}
-            className="w-full"
-            size="lg"
-          >
-            登录
-          </Button>
+            <div className="space-y-2">
+              <Label htmlFor="smsCode">验证码</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="smsCode"
+                  type="text"
+                  placeholder="请输入验证码"
+                  value={smsCode}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSmsCode(e.target.value)}
+                  maxLength={6}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSendSms}
+                  disabled={loading || countdown > 0}
+                  className="whitespace-nowrap"
+                >
+                  {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                </Button>
+              </div>
+            </div>
 
-          <div className="text-center text-sm text-gray-500">
-            <Link href="/" className="hover:underline">
-              返回首页
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? '登录中...' : '登录'}
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-2">
+          <div className="text-sm text-slate-500">
+            还没有账号？{' '}
+            <Link href="/register" className="text-primary hover:underline">
+              立即注册
             </Link>
           </div>
-        </CardContent>
+        </CardFooter>
       </Card>
     </div>
-  )
+  );
 }

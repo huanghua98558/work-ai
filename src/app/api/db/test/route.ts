@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getDatabase } from "@/lib/db";
 import { users, robots } from "@/storage/database/shared/schema";
 
 export async function GET() {
   try {
+    const db = await getDatabase();
     // 尝试查询用户表
     const userList = await db.select().from(users);
     const robotList = await db.select().from(robots);
