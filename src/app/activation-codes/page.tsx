@@ -584,6 +584,7 @@ export default function ActivationCodesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-20">ID</TableHead>
                     <TableHead>激活码</TableHead>
                     <TableHead>机器人名称</TableHead>
                     <TableHead>机器人ID</TableHead>
@@ -597,6 +598,9 @@ export default function ActivationCodesPage() {
                 <TableBody>
                   {codes.map((code) => (
                     <TableRow key={code.id}>
+                      <TableCell className="text-sm text-gray-600 dark:text-gray-400">
+                        #{code.id}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <code className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded font-mono">

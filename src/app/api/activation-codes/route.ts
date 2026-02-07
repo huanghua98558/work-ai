@@ -121,14 +121,38 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * 生成8位随机激活码（大写字母+数字）
+ * 生成12位随机激活码（数字+大写字母+小写字母）
+ * 格式：3位数字 + 3位大写字母 + 3位小写字母 + 3位混合
  */
 function generateActivationCode(): string {
-  return Array.from({ length: 8 }, () =>
-    Math.random() < 0.5
-      ? String.fromCharCode(65 + Math.floor(Math.random() * 26)) // A-Z
-      : String.fromCharCode(48 + Math.floor(Math.random() * 10))  // 0-9
-  ).join('').toUpperCase();
+  const chars = {
+    number: '0123456789',
+    upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    lower: 'abcdefghijklmnopqrstuvwxyz',
+    all: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+  };
+
+  // 前3位：数字
+  let code = Array.from({ length: 3 }, () =>
+    chars.number[Math.floor(Math.random() * chars.number.length)]
+  ).join('');
+
+  // 中间3位：大写字母
+  code += Array.from({ length: 3 }, () =>
+    chars.upper[Math.floor(Math.random() * chars.upper.length)]
+  ).join('');
+
+  // 后3位：小写字母
+  code += Array.from({ length: 3 }, () =>
+    chars.lower[Math.floor(Math.random() * chars.lower.length)]
+  ).join('');
+
+  // 最后3位：混合（数字+大小写字母）
+  code += Array.from({ length: 3 }, () =>
+    chars.all[Math.floor(Math.random() * chars.all.length)]
+  ).join('');
+
+  return code;
 }
 
 /**

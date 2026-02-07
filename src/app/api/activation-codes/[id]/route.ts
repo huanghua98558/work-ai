@@ -200,9 +200,12 @@ export async function DELETE(
 
     const codeId = parseInt(params.id);
 
-    // 验证激活码是否存在
+    // 验证激活码是否存在（同时查询设备信息）
     const existingCode = await client.query(
-      `SELECT * FROM activation_codes WHERE id = $1`,
+      `SELECT ac.*, da.id as device_activation_id, da.device_id as bound_device_id
+       FROM activation_codes ac
+       LEFT JOIN device_activations da ON ac.id = da.activation_code_id
+       WHERE ac.id = $1`,
       [codeId]
     );
 
@@ -223,6 +226,14 @@ export async function DELETE(
       );
     }
 
+    // 如果有设备绑定，先删除设备激活记录
+    if (code.device_activation_id) {
+      await client.query(
+        `DELETE FROM device_activations WHERE id = $1`,
+        [code.device_activation_id]
+      );
+    }
+
     // 如果激活码绑定了机器人，解绑机器人
     if (code.robot_id) {
       await client.query(
@@ -236,7 +247,9 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: "激活码删除成功",
+      message: code.bound_device_id
+        ? "激活码及其设备绑定已删除成功"
+        : "激活码删除成功",
     });
   } catch (error: any) {
     console.error("删除激活码错误:", error);
