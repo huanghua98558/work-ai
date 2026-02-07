@@ -6,6 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import {
   Bot,
@@ -39,6 +50,32 @@ interface Robot {
 export default function RobotsPage() {
   const [robots, setRobots] = useState<Robot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [selectedRobot, setSelectedRobot] = useState<Robot | null>(null);
+  const [configData, setConfigData] = useState({
+    systemPrompt: '',
+    enableKnowledgeBase: false,
+    knowledgeDataset: '',
+    enableStreamResponse: true,
+    temperature: 0.7,
+  });
+
+  const handleSaveConfig = () => {
+    console.log('Saving config:', configData);
+    setConfigDialogOpen(false);
+  };
+
+  const openConfigDialog = (robot: Robot) => {
+    setSelectedRobot(robot);
+    setConfigData({
+      systemPrompt: '',
+      enableKnowledgeBase: false,
+      knowledgeDataset: '',
+      enableStreamResponse: true,
+      temperature: 0.7,
+    });
+    setConfigDialogOpen(true);
+  };
 
   useEffect(() => {
     // 模拟数据加载
@@ -239,97 +276,6 @@ export default function RobotsPage() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </MainLayout>
-  );
-}
-
-  return (
-    <MainLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">机器人管理</h1>
-          <p className="text-slate-500">管理所有机器人设备</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>机器人列表</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">加载中...</div>
-            ) : robots.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">暂无机器人</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>机器人 ID</TableHead>
-                    <TableHead>设备 ID</TableHead>
-                    <TableHead>激活码</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>最后活跃</TableHead>
-                    <TableHead>操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {robots.map((robot) => (
-                    <TableRow key={robot.id}>
-                      <TableCell className="font-mono text-sm">
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-4 w-4" />
-                          {robot.robotId}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {robot.deviceId || '-'}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {robot.activationCode}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`h-2 w-2 rounded-full ${
-                              robot.status === 'active' ? 'bg-green-500' : 'bg-slate-400'
-                            }`}
-                          />
-                          <span className="text-sm">
-                            {robot.status === 'active' ? '活跃' : '未激活'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {robot.lastActiveAt
-                          ? new Date(robot.lastActiveAt).toLocaleString()
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggle(robot.robotId)}
-                          >
-                            <Power className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openConfigDialog(robot)}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
           </CardContent>
         </Card>
 
