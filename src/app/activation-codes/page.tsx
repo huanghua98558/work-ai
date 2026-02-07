@@ -112,6 +112,9 @@ export default function ActivationCodesPage() {
       const codesData = await codesRes.json();
       const robotsData = await robotsRes.json();
 
+      console.log('加载激活码响应:', codesData);
+      console.log('加载机器人响应:', robotsData);
+
       if (codesRes.status === 401) {
         alert('登录已过期，请重新登录');
         window.location.href = '/login';
@@ -125,6 +128,7 @@ export default function ActivationCodesPage() {
       }
 
       if (codesData.success) {
+        console.log('设置激活码数据:', codesData.data);
         setCodes(codesData.data);
       }
       if (robotsData.success) {
@@ -190,14 +194,18 @@ export default function ActivationCodesPage() {
 
       const data = await res.json();
 
+      console.log('创建激活码响应:', data);
+
       if (data.success) {
-        const count = data.data.length || 1;
+        const newCodes = data.data || [];
+        const count = Array.isArray(newCodes) ? newCodes.length : 1;
         alert(`成功生成 ${count} 个激活码！`);
         setCreateDialogOpen(false);
         setSelectedRobotId('');
         setRobotName('');
         setNotes('');
         setBatchCount('1');
+        // 立即刷新列表
         await loadData();
       } else {
         alert(`生成失败：${data.error}`);
@@ -636,7 +644,7 @@ export default function ActivationCodesPage() {
 
       {/* 生成激活码弹窗 */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 mx-auto">
           <DialogHeader>
             <DialogTitle>生成新激活码</DialogTitle>
             <DialogDescription>
@@ -750,7 +758,7 @@ export default function ActivationCodesPage() {
 
       {/* 编辑激活码弹窗 */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 mx-auto">
           <DialogHeader>
             <DialogTitle>编辑激活码</DialogTitle>
             <DialogDescription>
@@ -805,7 +813,7 @@ export default function ActivationCodesPage() {
 
       {/* 查看详情弹窗 */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 mx-auto">
           <DialogHeader>
             <DialogTitle>激活码详情</DialogTitle>
             <DialogDescription>
