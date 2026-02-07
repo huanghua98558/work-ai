@@ -588,22 +588,24 @@ export default function ActivationCodesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-20">ID</TableHead>
-                    <TableHead>激活码</TableHead>
-                    <TableHead>机器人名称</TableHead>
-                    <TableHead>机器人ID</TableHead>
-                    <TableHead>设备ID</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>有效期</TableHead>
-                    <TableHead>创建时间</TableHead>
-                    <TableHead>操作</TableHead>
+                    <TableHead className="w-16 font-bold bg-slate-100 dark:bg-slate-800 text-center">ID</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">激活码</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">机器人名称</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">机器人ID</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">设备ID</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">状态</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">有效期</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">创建时间</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {codes.map((code) => (
                     <TableRow key={code.id}>
-                      <TableCell className="text-sm text-gray-600 dark:text-gray-400">
-                        #{code.id}
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-bold text-base px-3 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-2">
+                          #{code.id}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
