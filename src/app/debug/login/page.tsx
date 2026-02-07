@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,24 @@ export default function LoginDebugPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  // LocalStorage 状态
+  const [hasToken, setHasToken] = useState(false);
+  const [hasUser, setHasUser] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // 客户端加载时检查 LocalStorage
+  useEffect(() => {
+    setMounted(true);
+    setHasToken(!!localStorage.getItem('token'));
+    setHasUser(!!localStorage.getItem('user'));
+  }, []);
+
+  // 刷新 LocalStorage 状态
+  const refreshLocalStorage = () => {
+    setHasToken(!!localStorage.getItem('token'));
+    setHasUser(!!localStorage.getItem('user'));
+  };
 
   const testLogin = async () => {
     setLoading(true);
@@ -47,6 +65,7 @@ export default function LoginDebugPage() {
         // 自动保存 token
         localStorage.setItem('token', data.data.token);
         localStorage.setItem('user', JSON.stringify(data.data.user));
+        refreshLocalStorage();
       } else {
         toast({
           title: '登录失败',
@@ -265,13 +284,13 @@ export default function LoginDebugPage() {
             <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <span className="text-sm text-gray-600 dark:text-gray-400">Token</span>
               <span className="text-sm font-medium">
-                {localStorage.getItem('token') ? '已保存' : '未保存'}
+                {mounted ? (hasToken ? '已保存' : '未保存') : '检查中...'}
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <span className="text-sm text-gray-600 dark:text-gray-400">用户信息</span>
               <span className="text-sm font-medium">
-                {localStorage.getItem('user') ? '已保存' : '未保存'}
+                {mounted ? (hasUser ? '已保存' : '未保存') : '检查中...'}
               </span>
             </div>
             <div className="flex gap-3">
@@ -294,6 +313,7 @@ export default function LoginDebugPage() {
                   localStorage.removeItem('token');
                   localStorage.removeItem('user');
                   setResult(null);
+                  refreshLocalStorage();
                   toast({
                     title: '已清除',
                     description: 'LocalStorage 已清空',

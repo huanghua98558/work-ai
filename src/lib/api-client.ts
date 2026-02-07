@@ -7,24 +7,51 @@ interface RequestOptions extends RequestInit {
   onPermissionError?: () => void;  // 权限错误回调
 }
 
+// 确保只在客户端访问 localStorage
+const isClient = typeof window !== 'undefined';
+
+/**
+ * 获取 Token
+ */
+function getToken(): string | null {
+  if (!isClient) return null;
+  return localStorage.getItem('token');
+}
+
+/**
+ * 设置 Token
+ */
+function setToken(token: string): void {
+  if (!isClient) return;
+  localStorage.setItem('token', token);
+}
+
+/**
+ * 移除 Token
+ */
+function removeToken(): void {
+  if (!isClient) return;
+  localStorage.removeItem('token');
+}
+
 /**
  * 认证请求包装器 - 自动处理 403 权限错误
  */
-export async function authenticatedFetch(
+async function authenticatedFetch(
   url: string,
   options: RequestOptions = {}
 ): Promise<any> {
   const { autoFixRole = true, onPermissionError, ...fetchOptions } = options;
 
-  const token = localStorage.getItem('token');
+  const token = getToken();
 
-  if (!token) {
+  if (!token && isClient) {
     throw new Error('未登录');
   }
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
+    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...fetchOptions.headers,
   };
 
@@ -32,7 +59,7 @@ export async function authenticatedFetch(
     const response = await fetch(url, { ...fetchOptions, headers });
 
     // 检查 403 权限错误
-    if (response.status === 403 && autoFixRole) {
+    if (response.status === 403 && autoFixRole && isClient) {
       console.log('[API 客户端] 检测到权限不足（403），尝试自动修复');
 
       // 尝试检查并修复角色
@@ -46,7 +73,7 @@ export async function authenticatedFetch(
           // 角色不一致，使用新的 Token
           const newToken = checkData.data.newToken;
           console.log('[API 客户端] 使用新的 Token 重新请求');
-          localStorage.setItem('token', newToken);
+          setToken(newToken);
 
           // 显示提示
           showToast('权限已更新', `您的角色已从 ${checkData.data.oldRole} 更新为 ${checkData.data.newRole}，正在重新加载...`);
@@ -82,6 +109,64 @@ export async function authenticatedFetch(
     throw error;
   }
 }
+
+/**
+ * API 客户端实例 - 兼容旧代码
+ */
+export const apiClient = {
+  /**
+   * GET 请求
+   */
+  async get<T = any>(url: string): Promise<{ data: T }> {
+    const response = await authenticatedFetch(url, { method: 'GET' });
+    return { data: response };
+  },
+
+  /**
+   * POST 请求
+   */
+  async post<T = any>(url: string, data: any): Promise<{ data: T }> {
+    const response = await authenticatedFetch(url, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return { data: response };
+  },
+
+  /**
+   * PUT 请求
+   */
+  async put<T = any>(url: string, data: any): Promise<{ data: T }> {
+    const response = await authenticatedFetch(url, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return { data: response };
+  },
+
+  /**
+   * DELETE 请求
+   */
+  async delete<T = any>(url: string): Promise<{ data: T }> {
+    const response = await authenticatedFetch(url, { method: 'DELETE' });
+    return { data: response };
+  },
+
+  /**
+   * 设置 Token
+   */
+  setToken,
+
+  /**
+   * 获取 Token
+   */
+  getToken,
+
+  /**
+   * 移除 Token
+   */
+  removeToken,
+};
 
 /**
  * 显示 Toast 提示
