@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Activity } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginDebugPage() {
   const { toast } = useToast();
@@ -88,6 +89,27 @@ export default function LoginDebugPage() {
             用于测试和排查登录问题
           </p>
         </div>
+
+        {/* 系统健康检查卡片 */}
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-600" />
+              系统健康检查
+            </CardTitle>
+            <CardDescription>
+              检查数据库连接、管理员账号和登录功能
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/debug/health">
+              <Button className="w-full">
+                <Activity className="mr-2 h-4 w-4" />
+                打开系统健康检查
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
         {/* 快速测试卡片 */}
         <Card>
