@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 import {
   Key,
   Plus,
@@ -74,6 +75,7 @@ export default function ActivationCodesPage() {
   const [robots, setRobots] = useState<Robot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { toast } = useToast();
   
   // 生成激活码弹窗
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -116,13 +118,21 @@ export default function ActivationCodesPage() {
       console.log('加载机器人响应:', robotsData);
 
       if (codesRes.status === 401) {
-        alert('登录已过期，请重新登录');
+        toast({
+          title: '登录已过期',
+          description: '请重新登录',
+          variant: 'destructive',
+        });
         window.location.href = '/login';
         return;
       }
 
       if (robotsRes.status === 401) {
-        alert('登录已过期，请重新登录');
+        toast({
+          title: '登录已过期',
+          description: '请重新登录',
+          variant: 'destructive',
+        });
         window.location.href = '/login';
         return;
       }
@@ -137,7 +147,11 @@ export default function ActivationCodesPage() {
     } catch (error: any) {
       console.error('加载数据失败:', error);
       if (error.message?.includes('401') || error.message?.includes('未授权')) {
-        alert('登录已过期，请重新登录');
+        toast({
+          title: '登录已过期',
+          description: '请重新登录',
+          variant: 'destructive',
+        });
         window.location.href = '/login';
       }
     } finally {
@@ -159,7 +173,11 @@ export default function ActivationCodesPage() {
   // 复制激活码
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    alert('已复制到剪贴板');
+    toast({
+      title: '复制成功',
+      description: '激活码已复制到剪贴板',
+      variant: 'success',
+    });
   };
 
   // 生成激活码
@@ -199,7 +217,11 @@ export default function ActivationCodesPage() {
       if (data.success) {
         const newCodes = data.data || [];
         const count = Array.isArray(newCodes) ? newCodes.length : 1;
-        alert(`成功生成 ${count} 个激活码！`);
+        toast({
+          title: '创建成功',
+          description: `成功生成 ${count} 个激活码！`,
+          variant: 'success',
+        });
         setCreateDialogOpen(false);
         setSelectedRobotId('');
         setRobotName('');
@@ -208,16 +230,28 @@ export default function ActivationCodesPage() {
         // 立即刷新列表
         await loadData();
       } else {
-        alert(`生成失败：${data.error}`);
+        toast({
+          title: '创建失败',
+          description: data.error || '请稍后重试',
+          variant: 'destructive',
+        });
       }
     } catch (error: any) {
       console.error('生成激活码失败:', error);
       if (error.message?.includes('401') || error.message?.includes('未授权')) {
-        alert('登录已过期，请重新登录');
+        toast({
+          title: '登录已过期',
+          description: '请重新登录',
+          variant: 'destructive',
+        });
         // 可以在这里添加跳转到登录页的逻辑
         window.location.href = '/login';
       } else {
-        alert('生成失败，请稍后重试');
+        toast({
+          title: '创建失败',
+          description: '请稍后重试',
+          variant: 'destructive',
+        });
       }
     } finally {
       setIsCreating(false);
@@ -254,16 +288,28 @@ export default function ActivationCodesPage() {
       const data = await res.json();
 
       if (data.success) {
-        alert('更新成功！');
+        toast({
+          title: '更新成功',
+          description: '激活码已更新',
+          variant: 'success',
+        });
         setEditDialogOpen(false);
         setEditingCode(null);
         await loadData();
       } else {
-        alert(`更新失败：${data.error}`);
+        toast({
+          title: '更新失败',
+          description: data.error || '请稍后重试',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('更新激活码失败:', error);
-      alert('更新失败，请稍后重试');
+      toast({
+        title: '更新失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -288,14 +334,26 @@ export default function ActivationCodesPage() {
       const data = await res.json();
 
       if (data.success) {
-        alert('删除成功！');
+        toast({
+          title: '删除成功',
+          description: '激活码已删除',
+          variant: 'success',
+        });
         await loadData();
       } else {
-        alert(`删除失败：${data.error}`);
+        toast({
+          title: '删除失败',
+          description: data.error || '请稍后重试',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('删除激活码失败:', error);
-      alert('删除失败，请稍后重试');
+      toast({
+        title: '删除失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -324,21 +382,37 @@ export default function ActivationCodesPage() {
       const data = await res.json();
 
       if (data.success) {
-        alert('设备解绑成功！');
+        toast({
+          title: '解绑成功',
+          description: '设备已解绑',
+          variant: 'success',
+        });
         await loadData();
       } else {
-        alert(`解绑失败：${data.error}`);
+        toast({
+          title: '解绑失败',
+          description: data.error || '请稍后重试',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('解绑设备失败:', error);
-      alert('解绑失败，请稍后重试');
+      toast({
+        title: '解绑失败',
+        description: '请稍后重试',
+        variant: 'destructive',
+      });
     }
   };
 
   // 批量导出
   const handleExport = () => {
     if (codes.length === 0) {
-      alert('没有可导出的激活码');
+      toast({
+        title: '导出失败',
+        description: '没有可导出的激活码',
+        variant: 'destructive',
+      });
       return;
     }
 
