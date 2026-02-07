@@ -10,37 +10,37 @@ import { z } from "zod";
  * 解绑设备验证 Schema
  */
 const unbindDeviceSchema = z.object({
-  code: z.string().min(1).optional(), // 通过激活码解绑
-  robotId: z.string().min(1).optional(), // 通过机器人ID解绑
+  code: z.string().optional(),
+  robotId: z.string().optional(),
   reason: z.string().optional(),
 }).refine(
-  data => data.code || data.robotId,
-  { message: "必须提供 code 或 robotId 参数" }
+  (data) => data.code || data.robotId,
+  { message: "必须提供激活码或机器人ID" }
+).refine(
+  (data) => !(data.code && data.robotId),
+  { message: "只能提供激活码或机器人ID之一" }
 );
 
 /**
- * 解绑设备接口
+ * 管理员解绑设备
  * POST /api/admin/unbind-device
  *
- * 功能：
- * 1. 删除 device_activations 表中的激活记录
- * 2. 将 activation_codes 状态从 used 改为 unused
- * 3. 将 robots 状态改为 offline
- * 4. 记录操作日志
- *
- * 支持两种方式：
- * - 通过激活码解绑（前端管理页面使用）
- * - 通过机器人ID解绑
+ * 流程：
+ * 1. 验证管理员权限
+ * 2. 根据激活码或robotId查找设备绑定
+ * 3. 删除设备绑定记录
+ * 4. 删除设备token记录
+ * 5. 记录解绑日志
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
   try {
     const user = requireAuth(request);
 
-    // 只有管理员可以解绑设备
+    // 验证管理员权限
     if (!isAdmin(user)) {
       return NextResponse.json(
-        { success: false, error: "权限不足" },
+        { success: false, error: "权限不足，需要管理员权限" },
         { status: 403 }
       );
     }
@@ -48,119 +48,104 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = unbindDeviceSchema.parse(body);
 
-    const { code, robotId, reason } = validatedData;
-
-    console.log('解绑设备请求:', { code, robotId, reason });
-
-    // 查找激活记录（支持通过激活码或机器人ID查找）
-    let activation: any;
-    let query: string;
-    let params: any[];
-
-    if (code) {
-      // 通过激活码查找
-      query = `
-        SELECT da.*, ac.code as activation_code
-        FROM device_activations da
-        JOIN activation_codes ac ON da.activation_code_id = ac.id
-        WHERE ac.code = $1
-      `;
-      params = [code.toUpperCase()];
-    } else {
-      // 通过机器人ID查找
-      query = `
-        SELECT da.*, ac.code as activation_code
-        FROM device_activations da
-        JOIN activation_codes ac ON da.activation_code_id = ac.id
-        WHERE da.robot_id = $1
-      `;
-      params = [robotId];
-    }
-
-    const activationResult = await client.query(query, params);
-
-    if (activationResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: code ? "未找到该激活码的激活记录" : "未找到该机器人的激活记录" },
-        { status: 404 }
-      );
-    }
-
-    activation = activationResult.rows[0];
-
-    // 查找关联的激活码
-    const activationCodeResult = await client.query(
-      `SELECT * FROM activation_codes WHERE id = $1`,
-      [activation.activation_code_id]
-    );
-
-    if (activationCodeResult.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "激活码不存在" },
-        { status: 404 }
-      );
-    }
-
-    const activationCode = activationCodeResult.rows[0];
-
-    // 删除激活记录
-    await client.query(
-      `DELETE FROM device_activations WHERE robot_id = $1`,
-      [activation.robot_id]
-    );
-
-    // 更新激活码状态（从 used 改为 unused）
-    await client.query(
-      `UPDATE activation_codes
-       SET status = 'unused', used_count = used_count - 1
-       WHERE id = $1 AND status = 'used'`,
-      [activationCode.id]
-    );
-
-    // 更新机器人状态为离线
-    await client.query(
-      `UPDATE robots SET status = 'offline' WHERE robot_id = $1`,
-      [activation.robot_id]
-    );
-
-    // 记录操作日志（如果有操作日志表）
-    try {
-      await client.query(
-        `INSERT INTO operation_logs (
-          operator_id, operation_type, target_type, target_id, details, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          user.userId,
-          'unbind_device',
-          'robot',
-          activation.robot_id,
-          JSON.stringify({
-            reason,
-            code: activationCode.code,
-            deviceInfo: activation.device_info,
-            activatedAt: activation.activated_at,
-          }),
-          new Date().toISOString(),
-        ]
-      );
-    } catch (error) {
-      // 操作日志表可能不存在，忽略错误
-      console.log('操作日志记录失败（可能日志表不存在）:', error);
-    }
-
-    console.log('设备解绑成功:', { robotId: activation.robot_id, code: activationCode.code });
-
-    return NextResponse.json({
-      success: true,
-      message: "设备解绑成功",
-      data: {
-        robotId: activation.robot_id,
-        activationCodeId: activationCode.id,
-        activationCode: activationCode.code,
-        unbindReason: reason,
-      },
+    console.log('解绑设备请求:', {
+      userId: user.userId,
+      code: validatedData.code,
+      robotId: validatedData.robotId,
+      reason: validatedData.reason,
     });
+
+    let robotId = null;
+    let activationCode = null;
+
+    // 根据激活码查找robotId
+    if (validatedData.code) {
+      const codeResult = await client.query(
+        `SELECT * FROM activation_codes
+         WHERE code = $1
+         LIMIT 1`,
+        [validatedData.code.toUpperCase()]
+      );
+
+      if (codeResult.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "激活码不存在" },
+          { status: 404 }
+        );
+      }
+
+      activationCode = codeResult.rows[0];
+      robotId = activationCode.robot_id;
+    } else if (validatedData.robotId) {
+      robotId = validatedData.robotId;
+    }
+
+    if (!robotId) {
+      return NextResponse.json(
+        { success: false, error: "无法确定机器人ID" },
+        { status: 400 }
+      );
+    }
+
+    // 查找设备绑定
+    const deviceBindingResult = await client.query(
+      `SELECT * FROM device_bindings WHERE robot_id = $1`,
+      [robotId]
+    );
+
+    if (deviceBindingResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "该机器人未绑定设备" },
+        { status: 404 }
+      );
+    }
+
+    const deviceBinding = deviceBindingResult.rows[0];
+
+    // 开始事务
+    await client.query('BEGIN');
+
+    try {
+      const now = new Date();
+
+      // 记录解绑日志（可选，可以创建一个device_unbind_logs表）
+      // 这里先简单记录到激活码的remark中
+      if (activationCode) {
+        const newRemark = (activationCode.remark || '') + `\n[解绑设备] ${now.toISOString()}: 设备ID=${deviceBinding.device_id}, 原因=${validatedData.reason || '管理员操作'}, 操作人=${user.userId}`;
+        await client.query(
+          `UPDATE activation_codes SET remark = $1 WHERE id = $2`,
+          [newRemark, activationCode.id]
+        );
+      }
+
+      // 删除设备绑定
+      await client.query(
+        `DELETE FROM device_bindings WHERE robot_id = $1`,
+        [robotId]
+      );
+
+      // 删除设备token
+      await client.query(
+        `DELETE FROM device_tokens WHERE robot_id = $1`,
+        [robotId]
+      );
+
+      // 提交事务
+      await client.query('COMMIT');
+
+      return NextResponse.json({
+        success: true,
+        message: "设备解绑成功",
+        data: {
+          robotId,
+          deviceId: deviceBinding.device_id,
+          unboundAt: now.toISOString(),
+        },
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
   } catch (error: any) {
     console.error("解绑设备错误:", error);
 

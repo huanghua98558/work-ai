@@ -1,6 +1,5 @@
 import WebSocket from 'ws';
 import { IncomingMessage } from 'http';
-import { verifyToken, JWTPayload } from '@/lib/jwt';
 import { pool } from '@/lib/db';
 
 console.log('[WebSocket] Module loaded, connection pool imported');
@@ -9,7 +8,8 @@ console.log('[WebSocket] Module loaded, connection pool imported');
 interface WSConnection {
   ws: WebSocket;
   robotId: string;
-  userId: number;
+  userId: number | null;
+  deviceId: string;
   lastHeartbeat: number;
 }
 
@@ -19,6 +19,9 @@ const connections = new Map<string, WSConnection>();
 const HEARTBEAT_INTERVAL = 30 * 1000; // 30秒
 // 超时判定（毫秒）
 const HEARTBEAT_TIMEOUT = 60 * 1000; // 60秒
+
+// 认证超时时间（毫秒）
+const AUTH_TIMEOUT = 30 * 1000; // 30秒
 
 // 心跳检测定时器
 let heartbeatTimer: NodeJS.Timeout | null = null;
@@ -53,107 +56,168 @@ export function initializeWebSocketServer(server: any) {
 
     // 处理连接
     wss.on('connection', async (ws: WebSocket, request: IncomingMessage) => {
+      let isAuthenticated = false;
+      let authTimeoutTimer: NodeJS.Timeout | null = null;
+
       try {
         const { searchParams } = new URL(request.url || '', `http://${request.headers.host}`);
         const robotId = searchParams.get('robotId');
         const token = searchParams.get('token');
 
+        console.log(`[WebSocket] 新连接尝试: robotId=${robotId}`);
+
         // 验证参数
         if (!robotId || !token) {
-          ws.send(JSON.stringify({
+          const errorMsg = {
             type: 'error',
+            code: 4001,
             message: '缺少必要参数：robotId 和 token',
-          }));
-          ws.close(1008, '缺少必要参数');
+          };
+          ws.send(JSON.stringify(errorMsg));
+          ws.close(4001, '缺少必要参数');
           return;
         }
 
-        // 验证 Token
-        const payload = verifyToken(token);
-        if (!payload) {
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: 'Token 无效或已过期',
-          }));
-          ws.close(1008, 'Token 无效');
-          return;
-        }
+        // 设置认证超时
+        authTimeoutTimer = setTimeout(() => {
+          if (!isAuthenticated) {
+            console.log(`[WebSocket] 机器人 ${robotId} 认证超时`);
+            const errorMsg = {
+              type: 'error',
+              code: 4006,
+              message: '认证超时',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4006, '认证超时');
+          }
+        }, AUTH_TIMEOUT);
 
-        // 验证机器人是否已激活
+        // 验证 Token 和设备绑定
         const client = await pool.connect();
         try {
-          const activationResult = await client.query(
-            'SELECT * FROM device_activations WHERE robot_id = $1 LIMIT 1',
+          // 查找 token 记录
+          const tokenResult = await client.query(
+            `SELECT * FROM device_tokens WHERE access_token = $1 AND robot_id = $2`,
+            [token, robotId]
+          );
+
+          if (tokenResult.rows.length === 0) {
+            if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+            const errorMsg = {
+              type: 'error',
+              code: 4001,
+              message: 'Token 无效',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4001, 'Token 无效');
+            return;
+          }
+
+          const tokenRecord = tokenResult.rows[0];
+
+          // 检查 token 是否过期
+          if (new Date() > new Date(tokenRecord.expires_at)) {
+            if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+            const errorMsg = {
+              type: 'error',
+              code: 4007,
+              message: 'Token 已过期',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4007, 'Token 已过期');
+            return;
+          }
+
+          // 检查设备绑定是否有效
+          const deviceBindingResult = await client.query(
+            `SELECT * FROM device_bindings WHERE robot_id = $1`,
             [robotId]
           );
 
-          if (activationResult.rows.length === 0) {
-            ws.send(JSON.stringify({
+          if (deviceBindingResult.rows.length === 0) {
+            if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+            const errorMsg = {
               type: 'error',
-              message: '机器人不存在或未激活',
-            }));
-            ws.close(1008, '机器人未激活');
+              code: 4001,
+              message: '设备未绑定',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4001, '设备未绑定');
             return;
           }
+
+          const deviceBinding = deviceBindingResult.rows[0];
+
+          // 认证成功
+          isAuthenticated = true;
+          if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+
+          // 创建连接记录
+          const connection: WSConnection = {
+            ws,
+            robotId,
+            userId: deviceBinding.user_id,
+            deviceId: deviceBinding.device_id,
+            lastHeartbeat: Date.now(),
+          };
+
+          connections.set(robotId, connection);
+
+          console.log(`[WebSocket] 机器人 ${robotId} 已认证并连接，当前连接数: ${connections.size}`);
+
+          // 发送认证成功消息
+          ws.send(JSON.stringify({
+            type: 'authenticated',
+            data: {
+              authenticated: true,
+              robotId,
+              deviceId: deviceBinding.device_id,
+              userId: deviceBinding.user_id,
+              timestamp: Date.now(),
+            },
+          }));
+
+          // 处理消息
+          ws.on('message', async (data: Buffer) => {
+            try {
+              const message = JSON.parse(data.toString());
+              await handleWsMessage(robotId, message, connection);
+            } catch (error) {
+              console.error(`[WebSocket] 消息处理错误:`, error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                code: 4000,
+                message: '消息格式错误',
+              }));
+            }
+          });
+
+          // 处理心跳
+          ws.on('pong', () => {
+            if (connections.has(robotId)) {
+              const conn = connections.get(robotId)!;
+              conn.lastHeartbeat = Date.now();
+            }
+          });
+
+          // 处理关闭
+          ws.on('close', () => {
+            connections.delete(robotId);
+            console.log(`[WebSocket] 机器人 ${robotId} 已断开，当前连接数: ${connections.size}`);
+          });
+
+          // 处理错误
+          ws.on('error', (error) => {
+            console.error(`[WebSocket] 机器人 ${robotId} 连接错误:`, error);
+            connections.delete(robotId);
+          });
+
         } finally {
           client.release();
         }
-
-        // 创建连接记录
-        const connection: WSConnection = {
-          ws,
-          robotId,
-          userId: payload.userId,
-          lastHeartbeat: Date.now(),
-        };
-
-        connections.set(robotId, connection);
-
-        console.log(`[WebSocket] 机器人 ${robotId} 已连接，当前连接数: ${connections.size}`);
-
-        // 发送连接成功消息
-        ws.send(JSON.stringify({
-          type: 'connected',
-          message: 'WebSocket 连接成功',
-          robotId,
-          timestamp: Date.now(),
-        }));
-
-        // 处理消息
-        ws.on('message', async (data: Buffer) => {
-          try {
-            const message = JSON.parse(data.toString());
-            await handleWsMessage(robotId, message, connection);
-          } catch (error) {
-            console.error(`[WebSocket] 消息处理错误:`, error);
-            ws.send(JSON.stringify({
-              type: 'error',
-              message: '消息格式错误',
-            }));
-          }
-        });
-
-        // 处理心跳
-        ws.on('pong', () => {
-          if (connections.has(robotId)) {
-            const conn = connections.get(robotId)!;
-            conn.lastHeartbeat = Date.now();
-          }
-        });
-
-        // 处理关闭
-        ws.on('close', () => {
-          connections.delete(robotId);
-          console.log(`[WebSocket] 机器人 ${robotId} 已断开，当前连接数: ${connections.size}`);
-        });
-
-        // 处理错误
-        ws.on('error', (error) => {
-          console.error(`[WebSocket] 机器人 ${robotId} 连接错误:`, error);
-          connections.delete(robotId);
-        });
       } catch (error) {
         console.error('[WebSocket] 连接处理错误:', error);
+        if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
         ws.close(1000, '连接处理失败');
       }
     });
@@ -198,11 +262,16 @@ async function handleWsMessage(robotId: string, message: any, connection: WSConn
       // 状态更新
       console.log(`[WebSocket] 状态更新:`, data);
       await updateRobotStatus(robotId, data);
+      connection.ws.send(JSON.stringify({
+        type: 'status_ack',
+        timestamp: Date.now(),
+      }));
       break;
 
     default:
       connection.ws.send(JSON.stringify({
         type: 'error',
+        code: 4000,
         message: `未知的消息类型: ${type}`,
       }));
   }
@@ -216,7 +285,7 @@ async function updateRobotStatus(robotId: string, status: any) {
     const client = await pool.connect();
     try {
       await client.query(
-        'UPDATE device_activations SET last_active_at = NOW() WHERE robot_id = $1',
+        'UPDATE device_bindings SET last_active_at = NOW() WHERE robot_id = $1',
         [robotId]
       );
       console.log(`[WebSocket] 机器人 ${robotId} 状态已更新:`, status);
@@ -259,8 +328,6 @@ function startHeartbeatCheck() {
         connections.delete(robotId);
       }
     });
-
-    // 不自动停止心跳检测，保持定时器运行以便新的连接到来时能够继续工作
   }, HEARTBEAT_INTERVAL);
 }
 
@@ -310,6 +377,13 @@ export function getOnlineRobots(): string[] {
  */
 export function getConnectionCount(): number {
   return connections.size;
+}
+
+/**
+ * 获取指定机器人的连接信息
+ */
+export function getConnectionInfo(robotId: string): WSConnection | undefined {
+  return connections.get(robotId);
 }
 
 /**
