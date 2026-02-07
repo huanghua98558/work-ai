@@ -2,33 +2,34 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { getDatabase } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { pool } from "@/lib/db";
 import { generateAccessToken, generateRefreshToken, JWTPayload } from "@/lib/jwt";
 import { z } from "zod";
 
 const loginSchema = z.object({
   phone: z.string().min(1).max(20),
-  password: z.string().min(6),
+  password: z.string().min(1),
 });
 
 export async function POST(request: NextRequest) {
+  const client = await pool.connect();
   try {
     const body = await request.json();
     const validatedData = loginSchema.parse(body);
 
-    // 获取数据库实例
-    const db = await getDatabase();
+    console.log('登录请求:', { phone: validatedData.phone });
 
-    // 查询用户
-    const userResult = await db.execute(sql`
-      SELECT id, phone, nickname, avatar, role, status 
-      FROM users 
-      WHERE phone = ${validatedData.phone}
-      LIMIT 1
-    `);
+    // 查询用户（包含password_hash字段）
+    const userResult = await client.query(
+      `SELECT id, phone, nickname, avatar, role, status, password_hash
+       FROM users
+       WHERE phone = $1
+       LIMIT 1`,
+      [validatedData.phone]
+    );
 
     if (userResult.rows.length === 0) {
+      console.log('用户不存在:', validatedData.phone);
       return NextResponse.json(
         { success: false, error: "用户不存在" },
         { status: 401 }
@@ -39,22 +40,35 @@ export async function POST(request: NextRequest) {
 
     // 检查用户状态
     if (user.status !== "active") {
+      console.log('账户已被禁用:', user.status);
       return NextResponse.json(
         { success: false, error: "账户已被禁用" },
         { status: 403 }
       );
     }
 
-    // 验证密码（这里简化处理，实际应该存储密码哈希）
-    // 暂时使用手机号作为密码（仅用于测试）
-    const isPasswordValid = validatedData.password === user.phone;
+    // 验证密码
+    let isPasswordValid = false;
+
+    // 方式1：使用password_hash字段验证（新方式）
+    if (user.password_hash) {
+      isPasswordValid = validatedData.password === user.password_hash;
+    }
+
+    // 方式2：使用手机号作为密码（临时兼容，用于测试）
+    if (!isPasswordValid) {
+      isPasswordValid = validatedData.password === user.phone;
+    }
 
     if (!isPasswordValid) {
+      console.log('密码错误');
       return NextResponse.json(
         { success: false, error: "密码错误" },
         { status: 401 }
       );
     }
+
+    console.log('登录成功:', { userId: user.id, role: user.role });
 
     // 生成 JWT Token
     const payload: JWTPayload = {
@@ -67,11 +81,10 @@ export async function POST(request: NextRequest) {
     const refreshToken = generateRefreshToken(payload);
 
     // 更新最后登录时间
-    await db.execute(sql`
-      UPDATE users 
-      SET last_login_at = NOW()
-      WHERE id = ${user.id}
-    `);
+    await client.query(
+      `UPDATE users SET last_login_at = NOW() WHERE id = $1`,
+      [user.id]
+    );
 
     return NextResponse.json({
       success: true,
@@ -102,5 +115,7 @@ export async function POST(request: NextRequest) {
       { success: false, error: "登录失败", details: error.message },
       { status: 500 }
     );
+  } finally {
+    client.release();
   }
 }

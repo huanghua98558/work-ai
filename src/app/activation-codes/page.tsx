@@ -100,18 +100,34 @@ export default function ActivationCodesPage() {
         fetch('/api/activation-codes'),
         fetch('/api/robots'),
       ]);
-      
+
       const codesData = await codesRes.json();
       const robotsData = await robotsRes.json();
-      
+
+      if (codesRes.status === 401) {
+        alert('登录已过期，请重新登录');
+        window.location.href = '/login';
+        return;
+      }
+
+      if (robotsRes.status === 401) {
+        alert('登录已过期，请重新登录');
+        window.location.href = '/login';
+        return;
+      }
+
       if (codesData.success) {
         setCodes(codesData.data);
       }
       if (robotsData.success) {
         setRobots(robotsData.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载数据失败:', error);
+      if (error.message?.includes('401') || error.message?.includes('未授权')) {
+        alert('登录已过期，请重新登录');
+        window.location.href = '/login';
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
