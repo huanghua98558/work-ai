@@ -47,7 +47,7 @@ interface ActivationCode {
   code: string;
   robot_id?: string | null;
   robot_name?: string | null;
-  status: 'unused' | 'used' | 'expired' | 'disabled';
+  status: 'unused' | 'used' | 'expired' | 'disabled' | 'active';
   validity_period: number;
   bound_user_id: number | null;
   price?: string;
@@ -61,6 +61,8 @@ interface ActivationCode {
   notes?: string;
   device_id?: string | null;
   device_info?: any;
+  isActivated?: boolean;  // 是否已激活（绑定了设备）
+  isBound?: boolean;      // 是否已绑定用户
 }
 
 interface Robot {
@@ -603,9 +605,9 @@ export default function ActivationCodesPage() {
                   <TableRow>
                     <TableHead className="w-16 font-bold bg-slate-100 dark:bg-slate-800 text-center">ID</TableHead>
                     <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">激活码</TableHead>
-                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">机器人名称</TableHead>
                     <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">机器人ID</TableHead>
-                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">设备ID</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">已激活</TableHead>
+                    <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">已绑定</TableHead>
                     <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">状态</TableHead>
                     <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">有效期</TableHead>
                     <TableHead className="font-bold bg-slate-100 dark:bg-slate-800">创建时间</TableHead>
@@ -636,20 +638,48 @@ export default function ActivationCodesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {code.robot_name || <span className="text-gray-400">-</span>}
-                      </TableCell>
-                      <TableCell>
                         {code.robot_id ? (
-                          <code className="text-xs">{code.robot_id}</code>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-green-100 dark:bg-green-900 px-2 py-1 rounded">
+                              {code.robot_id}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyCode(code.robot_id)}
+                              className="text-green-600"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        {code.device_id ? (
-                          <code className="text-xs">{code.device_id}</code>
+                        {code.isActivated ? (
+                          <Badge className="bg-green-500 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            已激活
+                          </Badge>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <Badge variant="outline">
+                            <Shield className="h-3 w-3 mr-1" />
+                            未激活
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {code.isBound ? (
+                          <Badge className="bg-blue-500 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            已绑定
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            <Shield className="h-3 w-3 mr-1" />
+                            未绑定
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -702,14 +732,15 @@ export default function ActivationCodesPage() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {code.status === 'used' && code.device_id && (
+                          {code.isActivated && (
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleUnbindDevice(code.code)}
                               className="text-orange-600"
+                              title="解绑设备"
                             >
-                              解绑
+                              <Shield className="h-4 w-4" />
                             </Button>
                           )}
                           <Button

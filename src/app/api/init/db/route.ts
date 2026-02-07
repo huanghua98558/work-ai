@@ -7,59 +7,61 @@ import { pool } from "@/lib/db";
 /**
  * 初始化数据库表
  * POST /api/init/db
- *
- * 创建必要的数据库表和字段
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
   try {
     const results: any[] = [];
 
-    // 创建 user_robots 表
+    // 创建 device_bindings 表（设备绑定表）
     try {
       await client.query(`
-        CREATE TABLE IF NOT EXISTS user_robots (
+        CREATE TABLE IF NOT EXISTS device_bindings (
           id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
-          robot_id VARCHAR(50) NOT NULL,
-          nickname VARCHAR(100),
-          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(user_id, robot_id)
+          robot_id VARCHAR(50) NOT NULL UNIQUE,
+          device_id VARCHAR(100) NOT NULL,
+          device_info JSONB,
+          bound_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      results.push({ action: 'create_table', table: 'user_robots', status: 'success' });
+      results.push({ action: 'create_table', table: 'device_bindings', status: 'success' });
     } catch (error: any) {
-      results.push({ action: 'create_table', table: 'user_robots', status: 'error', message: error.message });
+      results.push({ action: 'create_table', table: 'device_bindings', status: 'error', message: error.message });
+    }
+
+    // 创建 device_tokens 表（设备token表）
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS device_tokens (
+          id SERIAL PRIMARY KEY,
+          robot_id VARCHAR(50) NOT NULL,
+          device_id VARCHAR(100) NOT NULL,
+          access_token VARCHAR(255) NOT NULL,
+          refresh_token VARCHAR(255) NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      results.push({ action: 'create_table', table: 'device_tokens', status: 'success' });
+    } catch (error: any) {
+      results.push({ action: 'create_table', table: 'device_tokens', status: 'error', message: error.message });
     }
 
     // 创建索引
     try {
-      await client.query(`CREATE INDEX IF NOT EXISTS idx_user_robots_user_id ON user_robots(user_id)`);
-      results.push({ action: 'create_index', index: 'idx_user_robots_user_id', status: 'success' });
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_device_bindings_robot_id ON device_bindings(robot_id)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_device_bindings_device_id ON device_bindings(device_id)`);
+      results.push({ action: 'create_index', index: 'device_bindings indexes', status: 'success' });
     } catch (error: any) {
-      results.push({ action: 'create_index', index: 'idx_user_robots_user_id', status: 'error', message: error.message });
+      results.push({ action: 'create_index', index: 'device_bindings indexes', status: 'error', message: error.message });
     }
 
     try {
-      await client.query(`CREATE INDEX IF NOT EXISTS idx_user_robots_robot_id ON user_robots(robot_id)`);
-      results.push({ action: 'create_index', index: 'idx_user_robots_robot_id', status: 'success' });
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_device_tokens_robot_id ON device_tokens(robot_id)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_device_tokens_access_token ON device_tokens(access_token)`);
+      results.push({ action: 'create_index', index: 'device_tokens indexes', status: 'success' });
     } catch (error: any) {
-      results.push({ action: 'create_index', index: 'idx_user_robots_robot_id', status: 'error', message: error.message });
-    }
-
-    // 更新 activation_records 表
-    try {
-      await client.query(`ALTER TABLE activation_records ADD COLUMN IF NOT EXISTS robot_id VARCHAR(50)`);
-      results.push({ action: 'add_column', table: 'activation_records', column: 'robot_id', status: 'success' });
-    } catch (error: any) {
-      results.push({ action: 'add_column', table: 'activation_records', column: 'robot_id', status: 'error', message: error.message });
-    }
-
-    try {
-      await client.query(`ALTER TABLE activation_records ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'unknown'`);
-      results.push({ action: 'add_column', table: 'activation_records', column: 'source', status: 'success' });
-    } catch (error: any) {
-      results.push({ action: 'add_column', table: 'activation_records', column: 'source', status: 'error', message: error.message });
+      results.push({ action: 'create_index', index: 'device_tokens indexes', status: 'error', message: error.message });
     }
 
     return NextResponse.json({

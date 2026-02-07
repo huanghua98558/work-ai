@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     );
     const total = parseInt(countResult.rows[0].total);
 
-    // 查询激活码列表（关联机器人信息）
+    // 查询激活码列表（关联机器人、设备绑定、用户绑定信息）
     const query = `
       SELECT
         ac.*,
@@ -97,12 +97,20 @@ export async function GET(request: NextRequest) {
         r.name as robot_name,
         r.status as robot_status,
         r.bot_id as robot_id,
-        da.device_id,
-        da.device_info
+        r.created_at as robot_created_at,
+        -- 设备绑定信息
+        db.device_id as bound_device_id,
+        db.device_info,
+        db.bound_at as device_bound_at,
+        -- 用户绑定信息
+        ur.user_id as bound_user_id,
+        ur.nickname as user_nickname,
+        ur.created_at as user_bound_at
       FROM activation_codes ac
       LEFT JOIN users u ON ac.created_by = u.id
       LEFT JOIN robots r ON ac.robot_id = r.bot_id
-      LEFT JOIN device_activations da ON ac.id = da.activation_code_id
+      LEFT JOIN device_bindings db ON r.bot_id = db.robot_id
+      LEFT JOIN user_robots ur ON r.bot_id = ur.robot_id
       ${whereClause}
       ORDER BY ac.created_at DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -111,9 +119,16 @@ export async function GET(request: NextRequest) {
     params.push(limit, offset);
     const result = await client.query(query, params);
 
+    // 格式化返回数据
+    const formattedData = result.rows.map(row => ({
+      ...row,
+      isActivated: !!row.bound_device_id, // 是否已激活（绑定了设备）
+      isBound: !!row.bound_user_id,       // 是否已绑定用户
+    }));
+
     return NextResponse.json({
       success: true,
-      data: result.rows,
+      data: formattedData,
       pagination: {
         total,
         page,
@@ -219,6 +234,8 @@ export async function POST(request: NextRequest) {
         ...newCodeResult.rows[0],
         robotId: botId,
         robotName: robot.name,
+        isActivated: false, // 初始未激活
+        isBound: false,     // 初始未绑定
       });
     }
 
