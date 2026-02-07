@@ -28,5 +28,14 @@ app.prepare().then(() => {
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> WebSocket: ws://${hostname}:${port}/ws`);
+  }).on('error', (err: any) => {
+    console.error('Server error:', err);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use`);
+    }
+    process.exit(1);
   });
+}).catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
