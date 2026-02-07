@@ -14,6 +14,14 @@ const createRobotSchema = z.object({
   name: z.string().min(1).max(100).default("未命名机器人"),
   botType: z.string().optional(), // bot_type
   description: z.string().optional(),
+  // AI 配置
+  aiMode: z.enum(['builtin', 'third_party']).default('builtin'),
+  aiProvider: z.string().default('doubao'),
+  aiModel: z.string().default('doubao-pro-4k'),
+  aiTemperature: z.number().min(0).max(1).default(0.7),
+  aiMaxTokens: z.number().int().min(100).max(8000).default(2000),
+  aiContextLength: z.number().int().min(0).max(50).default(10),
+  aiScenario: z.string().default('咨询'),
 });
 
 /**
@@ -71,9 +79,7 @@ export async function GET(request: NextRequest) {
     const query = `
       SELECT
         r.*,
-        u.nickname as user_name,
-        r.bot_id as robot_id,
-        NULL as robot_uuid
+        u.nickname as user_name
       FROM robots r
       LEFT JOIN users u ON r.created_by = u.id
       ${whereClause}
@@ -127,19 +133,26 @@ export async function POST(request: NextRequest) {
     // 插入机器人（使用实际存在的字段）
     const newRobotResult = await client.query(
       `INSERT INTO robots (
-        bot_id, name, description, bot_type, status, created_by, created_at, updated_at
+        bot_id, name, description, status, created_by, created_at, updated_at,
+        ai_mode, ai_provider, ai_model, ai_temperature, ai_max_tokens, ai_context_length, ai_scenario
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *`,
       [
         botId,
         validatedData.name,
         validatedData.description || null,
-        validatedData.botType || 'feishu',
         'offline', // 初始状态为离线
         user.userId,
         now.toISOString(),
         now.toISOString(),
+        validatedData.aiMode,
+        validatedData.aiProvider,
+        validatedData.aiModel,
+        validatedData.aiTemperature,
+        validatedData.aiMaxTokens,
+        validatedData.aiContextLength,
+        validatedData.aiScenario,
       ]
     );
 

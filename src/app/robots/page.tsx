@@ -78,44 +78,43 @@ export default function RobotsPage() {
   };
 
   useEffect(() => {
-    // 模拟数据加载
-    const mockRobots: Robot[] = [
-      {
-        id: 1,
-        robotId: 'bot_001',
-        name: '客服机器人1',
-        status: 'online',
-        aiMode: 'builtin',
-        aiProvider: 'doubao',
-        totalMessages: 1234,
-        lastActiveAt: '2 分钟前',
-        createdAt: '2024-01-15',
-      },
-      {
-        id: 2,
-        robotId: 'bot_002',
-        name: '企业助手',
-        status: 'online',
-        aiMode: 'third_party',
-        aiProvider: 'deepseek',
-        totalMessages: 856,
-        lastActiveAt: '5 分钟前',
-        createdAt: '2024-01-20',
-      },
-      {
-        id: 3,
-        robotId: 'bot_003',
-        name: '智能问答',
-        status: 'offline',
-        aiMode: 'builtin',
-        aiProvider: 'kimi',
-        totalMessages: 432,
-        lastActiveAt: '1 小时前',
-        createdAt: '2024-02-01',
-      },
-    ];
-    setRobots(mockRobots);
-    setLoading(false);
+    // 加载真实数据
+    const loadRobots = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/robots', { headers });
+        const data = await response.json();
+
+        if (data.success) {
+          // 转换API数据为页面需要的格式
+          const formattedRobots = data.data.map((robot: any) => ({
+            id: robot.id,
+            robotId: robot.bot_id || robot.robotId,
+            name: robot.name,
+            status: robot.status === 'online' ? 'online' : 'offline',
+            aiMode: robot.ai_mode || 'builtin',
+            aiProvider: robot.ai_provider || 'doubao',
+            totalMessages: robot.total_messages || 0,
+            lastActiveAt: robot.last_active_at || '-',
+            createdAt: robot.created_at,
+          }));
+          setRobots(formattedRobots);
+        }
+      } catch (error) {
+        console.error('加载机器人列表失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRobots();
   }, []);
 
   if (loading) {
