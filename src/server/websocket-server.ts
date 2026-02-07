@@ -2,7 +2,7 @@ import WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 import { pool } from '@/lib/db';
 
-console.log('[WebSocket] Module loaded, connection pool imported');
+console.log('[WebSocket] Module loaded (instance:', Date.now(), '), connection pool imported');
 
 // WebSocket 连接存储
 interface WSConnection {
@@ -11,6 +11,7 @@ interface WSConnection {
   userId: number | null;
   deviceId: string;
   lastHeartbeat: number;
+  connectedAt: number;  // 添加连接时间戳
 }
 
 const connections = new Map<string, WSConnection>();
@@ -25,6 +26,14 @@ const AUTH_TIMEOUT = 30 * 1000; // 30秒
 
 // 心跳检测定时器
 let heartbeatTimer: NodeJS.Timeout | null = null;
+
+// 全局服务器状态标志（模块加载之间保持一致）
+let globalServerStatus: 'running' | 'stopped' = 'stopped';
+if (typeof global !== 'undefined' && global.__webSocketServerStatus) {
+  // @ts-ignore
+  globalServerStatus = global.__webSocketServerStatus;
+  console.log('[WebSocket] 从全局变量恢复服务器状态:', globalServerStatus);
+}
 
 /**
  * 初始化 WebSocket 服务器
@@ -159,6 +168,7 @@ export function initializeWebSocketServer(server: any) {
             userId: deviceBinding.user_id,
             deviceId: deviceBinding.device_id,
             lastHeartbeat: Date.now(),
+            connectedAt: Date.now(),  // 记录真实的连接时间
           };
 
           connections.set(robotId, connection);
@@ -223,7 +233,11 @@ export function initializeWebSocketServer(server: any) {
     });
 
     // 启动心跳检测
-    startHeartbeatCheck();
+    try {
+      startHeartbeatCheck();
+    } catch (error) {
+      console.error('[WebSocket] 启动心跳检测失败:', error);
+    }
 
     console.log('[WebSocket] 服务器已启动');
   } catch (err) {
@@ -302,9 +316,11 @@ async function updateRobotStatus(robotId: string, status: any) {
  */
 function startHeartbeatCheck() {
   if (heartbeatTimer) {
+    console.log('[WebSocket] 心跳检测已经在运行');
     return;
   }
 
+  console.log('[WebSocket] 启动心跳检测...');
   heartbeatTimer = setInterval(() => {
     const now = Date.now();
     const timeoutConnections: string[] = [];
@@ -329,6 +345,16 @@ function startHeartbeatCheck() {
       }
     });
   }, HEARTBEAT_INTERVAL);
+
+  // 更新全局服务器状态
+  globalServerStatus = 'running';
+  if (typeof global !== 'undefined') {
+    // @ts-ignore
+    global.__webSocketServerStatus = 'running';
+    console.log('[WebSocket] 已设置全局服务器状态为 running');
+  }
+
+  console.log('[WebSocket] 心跳检测已启动');
 }
 
 /**
@@ -384,6 +410,15 @@ export function getConnectionCount(): number {
  */
 export function getConnectionInfo(robotId: string): WSConnection | undefined {
   return connections.get(robotId);
+}
+
+/**
+ * 获取 WebSocket 服务器状态
+ */
+export function getServerStatus(): 'running' | 'stopped' {
+  const status = globalServerStatus;
+  console.log(`[WebSocket] 获取服务器状态: ${status}`);
+  return status;
 }
 
 /**

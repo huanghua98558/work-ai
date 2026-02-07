@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest } from "next/server";
-import { getOnlineRobots, getConnectionCount } from "@/server/websocket-server";
+import { getOnlineRobots, getConnectionCount, getConnectionInfo, getServerStatus } from "@/server/websocket-server";
 
 /**
  * WebSocket 监控 API
@@ -12,22 +12,31 @@ import { getOnlineRobots, getConnectionCount } from "@/server/websocket-server";
  */
 export async function GET(request: NextRequest) {
   try {
+    // 获取服务器状态
+    const serverStatus = getServerStatus();
+
     // 获取在线机器人列表
     const onlineRobots = getOnlineRobots();
 
     // 获取连接数
     const connectionCount = getConnectionCount();
 
+    // 获取真实的连接信息
+    const robotsWithInfo = onlineRobots.map(robotId => {
+      const conn = getConnectionInfo(robotId);
+      return {
+        robotId,
+        status: 'online',
+        connectedAt: conn ? new Date(conn.connectedAt).toISOString() : new Date().toISOString(),
+      };
+    });
+
     return Response.json({
       success: true,
       data: {
         totalConnections: connectionCount,
-        onlineRobots: onlineRobots.map(robotId => ({
-          robotId,
-          status: 'online',
-          connectedAt: new Date().toISOString(),
-        })),
-        serverStatus: 'running',
+        onlineRobots: robotsWithInfo,
+        serverStatus: serverStatus,
         timestamp: new Date().toISOString(),
       },
     });
