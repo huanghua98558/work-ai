@@ -138,12 +138,11 @@ export default function ActivationCodesPage() {
       const requestBody: any = {
         validityPeriod: parseInt(validityPeriod),
         notes,
+        type: bindMode === 'existing' ? 'admin_dispatch' : 'pure_code',
       };
 
       if (bindMode === 'existing' && selectedRobotId) {
         requestBody.robotId = selectedRobotId;
-      } else if (bindMode === 'new' && robotName) {
-        requestBody.robotName = robotName;
       }
 
       const res = await fetch('/api/activation-codes', {
@@ -175,11 +174,16 @@ export default function ActivationCodesPage() {
     if (!editingCode) return;
 
     try {
+      // 计算有效期天数（从当前日期到过期日期）
+      const now = new Date();
+      const expiresAt = new Date(editingCode.expires_at);
+      const validityPeriod = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
       const res = await fetch(`/api/activation-codes/${editingCode.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          expiresAt: editingCode.expires_at,
+          validityPeriod: validityPeriod > 0 ? validityPeriod : 365, // 确保为正数
           notes: editingCode.notes,
         }),
       });
@@ -564,24 +568,40 @@ export default function ActivationCodesPage() {
           <DialogHeader>
             <DialogTitle>生成新激活码</DialogTitle>
             <DialogDescription>
-              生成激活码并绑定到机器人
+              {bindMode === 'existing' ? '绑定已有机器人的激活码' : '激活时自动创建机器人'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>选择绑定方式</Label>
+              <Label>激活码类型</Label>
               <Select value={bindMode} onValueChange={(v: 'existing' | 'new') => setBindMode(v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="选择绑定方式" />
+                  <SelectValue placeholder="选择激活码类型" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">创建新机器人</SelectItem>
-                  <SelectItem value="existing">绑定已存在的机器人</SelectItem>
+                  <SelectItem value="new">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">纯激活码</div>
+                        <div className="text-xs text-gray-500">激活时自动创建机器人</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="existing">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">绑定机器人</div>
+                        <div className="text-xs text-gray-500">绑定已存在的机器人</div>
+                      </div>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {bindMode === 'existing' ? (
+            {bindMode === 'existing' && (
               <div className="space-y-2">
                 <Label>选择机器人</Label>
                 <Select value={selectedRobotId} onValueChange={setSelectedRobotId}>
@@ -589,22 +609,13 @@ export default function ActivationCodesPage() {
                     <SelectValue placeholder="选择机器人" />
                   </SelectTrigger>
                   <SelectContent>
-                    {robots.map(robot => (
+                    {robots.filter(r => r.status !== 'deleted').map(robot => (
                       <SelectItem key={robot.robot_id} value={robot.robot_id}>
                         {robot.name} ({robot.robot_id})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>机器人名称</Label>
-                <Input
-                  placeholder="请输入机器人名称"
-                  value={robotName}
-                  onChange={(e) => setRobotName(e.target.value)}
-                />
               </div>
             )}
 
@@ -659,12 +670,22 @@ export default function ActivationCodesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>过期时间</Label>
-              <Input
-                type="datetime-local"
-                value={editingCode?.expires_at ? editingCode.expires_at.slice(0, 16) : ''}
-                onChange={(e) => setEditingCode({ ...editingCode!, expires_at: e.target.value })}
-              />
+              <Label>有效期（天）</Label>
+              <Select
+                value={editingCode?.validity_period?.toString() || '365'}
+                onValueChange={(value) => setEditingCode({ ...editingCode!, validity_period: parseInt(value) } as any)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择有效期" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">1个月（30天）</SelectItem>
+                  <SelectItem value="90">3个月（90天）</SelectItem>
+                  <SelectItem value="180">6个月（180天）</SelectItem>
+                  <SelectItem value="365">1年（365天）</SelectItem>
+                  <SelectItem value="730">2年（730天）</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
