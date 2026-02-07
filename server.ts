@@ -1,13 +1,20 @@
+import { config } from 'dotenv';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { initializeWebSocketServer } from './src/server/websocket-server';
 
+// 首先加载环境变量
+config();
+
+// 强制设置端口为 5000，防止被其他配置覆盖
+process.env.PORT = '5000';
+
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
 const port = parseInt(process.env.PORT || '5000', 10);
 
-console.log('[Server] Starting with config:', { dev, hostname, port });
+console.log('[Server] Starting with config:', { dev, hostname, port, NODE_ENV: process.env.NODE_ENV });
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
