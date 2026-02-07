@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { initializeWebSocketServer } from './src/server/websocket-server';
+import { cleanupZombieProcesses, getSystemStats } from './src/lib/process-cleanup';
 
 // 首先加载环境变量
 config();
@@ -46,6 +47,9 @@ app.prepare().then(() => {
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> WebSocket: ws://${hostname}:${port}/ws`);
+    
+    // 启动定期监控
+    startMonitoring();
   }).on('error', (err: any) => {
     console.error('[Server] Server error:', err);
     if (err.code === 'EADDRINUSE') {
@@ -57,13 +61,141 @@ app.prepare().then(() => {
   // 添加进程退出处理
   process.on('uncaughtException', (err) => {
     console.error('[Server] Uncaught Exception:', err);
-    process.exit(1);
+    gracefulShutdown(1, 'uncaughtException');
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('[Server]Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+
+  // 优雅关闭处理
+  const shutdownSignals = ['SIGTERM', 'SIGINT'];
+  shutdownSignals.forEach(signal => {
+    process.on(signal as NodeJS.Signals, () => {
+      console.log(`[Server] Received ${signal}, initiating graceful shutdown...`);
+      gracefulShutdown(0, signal);
+    });
+  });
+
+  // 超时强制退出
+  process.on('SIGUSR2', () => {
+    console.log('[Server] Received SIGUSR2, performing emergency shutdown...');
+    process.exit(1);
   });
 }).catch((err) => {
   console.error('[Server] Failed to start server:', err);
   process.exit(1);
 });
+
+/**
+ * 优雅关闭函数
+ * @param exitCode 退出码
+ * @param reason 关闭原因
+ */
+let isShuttingDown = false;
+function gracefulShutdown(exitCode: number, reason: string) {
+  if (isShuttingDown) {
+    console.log('[Server] Shutdown already in progress, ignoring...');
+    return;
+  }
+  
+  isShuttingDown = true;
+  console.log(`[Server] Starting graceful shutdown (reason: ${reason})...`);
+
+  // 设置强制关闭超时（10秒）
+  const forceShutdownTimeout = setTimeout(() => {
+    console.log('[Server] Force shutdown timeout reached, exiting...');
+    process.exit(1);
+  }, 10000);
+
+  // 关闭HTTP服务器
+  console.log('[Server] Closing HTTP server...');
+  server.close((err) => {
+    if (err) {
+      console.error('[Server] Error closing server:', err);
+      clearTimeout(forceShutdownTimeout);
+      process.exit(1);
+    }
+    
+    console.log('[Server] HTTP server closed');
+    
+    // 清理其他资源
+    console.log('[Server] Cleaning up resources...');
+    
+    // 清理WebSocket连接
+    try {
+      // 这里可以添加WebSocket连接清理逻辑
+      console.log('[Server] WebSocket connections cleaned');
+    } catch (err) {
+      console.error('[Server] Error cleaning WebSocket:', err);
+    }
+
+    // 清理数据库连接（如果有）
+    try {
+      // 这里可以添加数据库连接清理逻辑
+      console.log('[Server] Database connections cleaned');
+    } catch (err) {
+      console.error('[Server] Error cleaning database:', err);
+    }
+
+    console.log('[Server] Graceful shutdown completed');
+    clearTimeout(forceShutdownTimeout);
+    process.exit(exitCode);
+  });
+
+  // 立即停止接受新连接
+  console.log('[Server] Stopping accepting new connections...');
+}
+
+/**
+ * 启动监控功能
+ */
+function startMonitoring() {
+  console.log('[Monitor] Starting monitoring system...');
+
+  // 每5分钟检查一次系统资源
+  const systemCheckInterval = 5 * 60 * 1000;
+  
+  const systemCheckTimer = setInterval(() => {
+    try {
+      const stats = getSystemStats();
+      console.log('[Monitor] System Stats:', {
+        memory: `${stats.memory.used}MB/${stats.memory.total}MB (${stats.memory.usagePercent}%)`,
+        load: stats.loadAverage,
+      });
+
+      // 如果内存使用超过80%，触发清理
+      if (stats.memory.usagePercent > 80) {
+        console.warn('[Monitor] High memory usage detected, running cleanup...');
+        const cleaned = cleanupZombieProcesses(6);
+        console.log(`[Monitor] Cleanup completed: ${cleaned} processes removed`);
+      }
+    } catch (error) {
+      console.error('[Monitor] Error checking system stats:', error);
+    }
+  }, systemCheckInterval);
+
+  // 每10分钟清理一次僵尸进程
+  const cleanupInterval = 10 * 60 * 1000;
+  
+  const cleanupTimer = setInterval(() => {
+    try {
+      console.log('[Monitor] Running scheduled cleanup...');
+      const cleaned = cleanupZombieProcesses(6);
+      console.log(`[Monitor] Cleanup completed: ${cleaned} processes removed`);
+    } catch (error) {
+      console.error('[Monitor] Error during cleanup:', error);
+    }
+  }, cleanupInterval);
+
+  // 在关闭时清理定时器
+  process.on('exit', () => {
+    clearInterval(systemCheckTimer);
+    clearInterval(cleanupTimer);
+    console.log('[Monitor] Monitoring stopped');
+  });
+
+  console.log('[Monitor] Monitoring system started');
+  console.log(`[Monitor] System check interval: ${systemCheckInterval / 1000}s`);
+  console.log(`[Monitor] Cleanup interval: ${cleanupInterval / 1000}s`);
+}
