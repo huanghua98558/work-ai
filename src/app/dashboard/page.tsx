@@ -74,13 +74,18 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     totalRobots: 0,
     totalActivationCodes: 0,
+    unusedActivationCodes: 0,
+    usedActivationCodes: 0,
+    expiredActivationCodes: 0,
     totalConversations: 0,
     totalMessages: 0,
     activeRobots: 0,
     todayMessages: 0,
+    activeUsers: 0,
   })
   const [recentConversations, setRecentConversations] = useState<any[]>([])
   const [recentRobots, setRecentRobots] = useState<any[]>([])
+  const [recentActivationCodes, setRecentActivationCodes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
 
@@ -93,12 +98,14 @@ export default function DashboardPage() {
       const cachedStats = getCachedData(CACHE_KEYS.STATS)
       const cachedConversations = getCachedData(CACHE_KEYS.CONVERSATIONS)
       const cachedRobots = getCachedData(CACHE_KEYS.ROBOTS)
+      const cachedActivationCodes = getCachedData('dashboard_activation_codes')
 
-      if (cachedStats && cachedConversations && cachedRobots) {
+      if (cachedStats && cachedConversations && cachedRobots && cachedActivationCodes) {
         // 使用缓存数据快速渲染
         setStats(cachedStats)
         setRecentConversations(cachedConversations)
         setRecentRobots(cachedRobots)
+        setRecentActivationCodes(cachedActivationCodes)
         setLastUpdated(Date.now() - cachedStats.timestamp)
         setLoading(false)
 
@@ -119,47 +126,69 @@ export default function DashboardPage() {
     try {
       setLoading(true)
 
-      // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // 这里应该调用真实的API
-      // const response = await fetch('/api/dashboard/stats')
-      // const data = await response.json()
-
-      // 模拟数据
-      const newStats = {
-        totalRobots: 5,
-        totalActivationCodes: 120,
-        totalConversations: 85,
-        totalMessages: 1234,
-        activeRobots: 4,
-        todayMessages: 67,
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
       }
 
-      const newConversations = [
-        { id: 1, robotName: '客服机器人1', user: '用户001', lastMessage: '请问如何激活？', time: '2 分钟前', status: 'active' },
-        { id: 2, robotName: '企业助手', user: '员工002', lastMessage: '查询销售数据', time: '15 分钟前', status: 'active' },
-        { id: 3, robotName: '智能问答', user: '用户003', lastMessage: '产品价格是多少？', time: '1 小时前', status: 'closed' },
-      ]
+      // 调用真实的API
+      const response = await fetch('/api/dashboard/stats', { headers })
+      const data = await response.json()
 
-      const newRobots = [
-        { id: 1, name: '客服机器人1', status: 'online', messages: 456, lastActive: '2 分钟前' },
-        { id: 2, name: '企业助手', status: 'online', messages: 321, lastActive: '5 分钟前' },
-        { id: 3, name: '智能问答', status: 'offline', messages: 189, lastActive: '1 小时前' },
-      ]
+      if (!data.success) {
+        throw new Error(data.error || '获取数据失败')
+      }
+
+      // 从API响应中提取数据
+      const apiData = data.data
+
+      const newStats = {
+        totalRobots: apiData.stats.totalRobots,
+        totalActivationCodes: apiData.stats.totalActivationCodes,
+        unusedActivationCodes: apiData.stats.unusedActivationCodes,
+        usedActivationCodes: apiData.stats.usedActivationCodes,
+        expiredActivationCodes: apiData.stats.expiredActivationCodes,
+        totalConversations: apiData.stats.totalConversations,
+        totalMessages: apiData.stats.totalMessages,
+        activeRobots: apiData.stats.activeRobots,
+        todayMessages: apiData.stats.todayMessages,
+        activeUsers: apiData.stats.activeUsers,
+      }
+
+      const newConversations = apiData.recentConversations || []
+      const newRobots = apiData.recentRobots || []
 
       // 更新状态
       setStats(newStats)
       setRecentConversations(newConversations)
       setRecentRobots(newRobots)
+      setRecentActivationCodes(apiData.recentActivationCodes || [])
       setLastUpdated(Date.now())
 
       // 更新缓存
       setCachedData(CACHE_KEYS.STATS, newStats)
       setCachedData(CACHE_KEYS.CONVERSATIONS, newConversations)
       setCachedData(CACHE_KEYS.ROBOTS, newRobots)
-    } catch (error) {
+      setCachedData('dashboard_activation_codes', apiData.recentActivationCodes || [])
+    } catch (error: any) {
       console.error('Failed to refresh data:', error)
+      // 使用缓存数据作为fallback
+      const cachedStats = getCachedData(CACHE_KEYS.STATS)
+      const cachedConversations = getCachedData(CACHE_KEYS.CONVERSATIONS)
+      const cachedRobots = getCachedData(CACHE_KEYS.ROBOTS)
+
+      if (cachedStats) {
+        setStats(cachedStats)
+      }
+      if (cachedConversations) {
+        setRecentConversations(cachedConversations)
+      }
+      if (cachedRobots) {
+        setRecentRobots(cachedRobots)
+      }
     } finally {
       setLoading(false)
     }
@@ -245,7 +274,7 @@ export default function DashboardPage() {
           <StatCard
             title="激活码数量"
             value={stats.totalActivationCodes}
-            description="85 未使用 · 35 已使用"
+            description={`${stats.unusedActivationCodes} 未使用 · ${stats.usedActivationCodes} 已使用`}
             icon={Key}
             gradient="from-green-500 to-green-600"
           />
@@ -405,19 +434,46 @@ export default function DashboardPage() {
                   <TableRow>
                     <TableHead>名称</TableHead>
                     <TableHead>状态</TableHead>
-                    <TableHead>消息数</TableHead>
+                    <TableHead>今日消息</TableHead>
+                    <TableHead>最后活跃</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {recentRobots.map((robot) => (
                     <TableRow key={robot.id}>
-                      <TableCell className="font-medium">{robot.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>
+                          <div className="font-medium">{robot.name}</div>
+                          {robot.robot_id && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {robot.robot_id}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={robot.status === 'online' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={robot.status === 'online' ? 'default' : 'secondary'}
+                          className={
+                            robot.status === 'online'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                              : ''
+                          }
+                        >
                           {robot.status === 'online' ? '在线' : '离线'}
                         </Badge>
                       </TableCell>
-                      <TableCell>{robot.messages}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{robot.todayMessages}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            总计: {robot.messages}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{robot.lastActive}</div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -449,32 +505,62 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>激活码</TableHead>
+                    <TableHead>机器人</TableHead>
                     <TableHead>状态</TableHead>
                     <TableHead>时间</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">ABCD1234</TableCell>
-                    <TableCell>
-                      <Badge variant="default" className="bg-green-500">未使用</Badge>
-                    </TableCell>
-                    <TableCell>2分钟前</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">EFGH5678</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">已使用</Badge>
-                    </TableCell>
-                    <TableCell>1小时前</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">IJKL9012</TableCell>
-                    <TableCell>
-                      <Badge variant="default" className="bg-green-500">未使用</Badge>
-                    </TableCell>
-                    <TableCell>3小时前</TableCell>
-                  </TableRow>
+                  {recentActivationCodes && recentActivationCodes.length > 0 ? (
+                    recentActivationCodes.map((code) => (
+                      <TableRow key={code.id}>
+                        <TableCell className="font-mono text-sm">{code.code}</TableCell>
+                        <TableCell>
+                          <div>
+                            {code.robotName ? (
+                              <div className="text-sm font-medium">{code.robotName}</div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                            {code.robotId && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {code.robotId}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={code.status === 'unused' ? 'default' : 'secondary'}
+                            className={
+                              code.status === 'unused'
+                                ? 'bg-green-500'
+                                : code.status === 'used'
+                                ? 'bg-blue-500'
+                                : code.status === 'expired'
+                                ? 'bg-red-500'
+                                : 'bg-gray-500'
+                            }
+                          >
+                            {code.status === 'unused'
+                              ? '未使用'
+                              : code.status === 'used'
+                              ? '已使用'
+                              : code.status === 'expired'
+                              ? '已过期'
+                              : '已禁用'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{code.timeAgo}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-gray-500">
+                        暂无激活码
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
