@@ -206,45 +206,102 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* 快速操作 - 使用彩色卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Link href="/robots">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-blue-200 dark:border-blue-800">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-4">
-                <Bot className="h-6 w-6 text-white" />
+        {/* 快速操作 - 使用鲜艳的渐变色大卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Link href="/robots" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Bot className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">管理机器人</h3>
+                <p className="text-sm text-blue-100">配置和管理您的机器人</p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">管理机器人</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">配置和管理您的机器人</p>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
             </div>
           </Link>
 
-          <Link href="/activation-codes">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-green-200 dark:border-green-800">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-4">
-                <Key className="h-6 w-6 text-white" />
+          <Link href="/activation-codes" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Key className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">生成激活码</h3>
+                <p className="text-sm text-green-100">创建和管理激活码</p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">生成激活码</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">创建和管理激活码</p>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
             </div>
           </Link>
 
-          <Link href="/knowledge">
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-purple-200 dark:border-purple-800">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-4">
-                <Activity className="h-6 w-6 text-white" />
+          <Link href="/knowledge" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Activity className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">知识库管理</h3>
+                <p className="text-sm text-purple-100">上传和管理文档</p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">知识库管理</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">上传和管理文档</p>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
             </div>
           </Link>
 
-          <Link href="/messages">
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-orange-200 dark:border-orange-800">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mb-4">
-                <MessageSquare className="h-6 w-6 text-white" />
+          <Link href="/messages" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <MessageSquare className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">查看消息</h3>
+                <p className="text-sm text-orange-100">查看对话记录</p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">查看消息</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">查看对话记录</p>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            </div>
+          </Link>
+        </div>
+
+        {/* 快速操作第二行 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Link href="/users" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-500 via-pink-600 to-red-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                      <Users className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">用户管理</h3>
+                      <p className="text-sm text-rose-100">管理系统用户和权限</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-20 h-20 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              </div>
+            </div>
+          </Link>
+
+          <Link href="/settings" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-600 to-green-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                      <Settings className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">系统设置</h3>
+                      <p className="text-sm text-cyan-100">配置系统参数和选项</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-20 h-20 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              </div>
             </div>
           </Link>
         </div>
