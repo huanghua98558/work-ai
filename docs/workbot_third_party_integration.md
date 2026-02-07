@@ -294,6 +294,152 @@ if (signature !== expectedSignature) {
 | 304 | 清空客户端指令 | 清空所有待执行指令 |
 | 305 | 清除指定指令 | 清除指定messageId的指令 |
 | 512 | 获取群成员信息 | 获取指定群的成员列表 |
+| 900 | 收藏消息 | 从收藏夹中选取收藏并发送 |
+
+#### 收藏消息指令（type=900）
+
+从企业微信收藏夹中选取收藏的消息并发送到指定的群或好友。
+
+**请求格式**：
+```http
+POST /api/robot/send-message
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",
+    "locatorType": "INDEX",
+    "index": 0
+  }
+}
+```
+
+**参数说明**：
+
+| 参数 | 类型 | 必填 | 说明 | 示例 |
+|------|------|------|------|------|
+| commandType | integer | 是 | 指令类型，固定值 900 | 900 |
+| targetChat | string | 是 | 目标接收者：群名或人名 | `"工作群"`（群发）或 `"张三"`（私发） |
+| locatorType | string | 是 | 定位收藏的方式 | `"INDEX"`、`"KEYWORD"`、`"TIME"` |
+| index | integer | 否 | 按索引定位时的收藏序号（从0开始） | 0 = 第1条，1 = 第2条 |
+| keyword | string | 否 | 按关键词搜索收藏 | `"重要通知"` |
+| timePattern | string | 否 | 按时间定位收藏 | `"2024-01-15"` |
+
+**locatorType 说明**：
+
+| 值 | 说明 | 配合参数 |
+|----|------|----------|
+| INDEX | 按索引定位 | index（从0开始，0表示第1条收藏） |
+| KEYWORD | 按关键词搜索收藏 | keyword（匹配收藏标题或内容） |
+| TIME | 按时间定位收藏 | timePattern（匹配收藏时间） |
+
+**示例1：发送第1条收藏到群聊**
+
+```http
+POST /api/robot/send-message
+Authorization: Bearer {token}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",
+    "locatorType": "INDEX",
+    "index": 0
+  }
+}
+```
+
+**示例2：发送第5条收藏到好友**
+
+```http
+POST /api/robot/send-message
+Authorization: Bearer {token}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "张三",
+    "locatorType": "INDEX",
+    "index": 4
+  }
+}
+```
+
+**示例3：按关键词搜索并发送收藏**
+
+```http
+POST /api/robot/send-message
+Authorization: Bearer {token}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "客服群",
+    "locatorType": "KEYWORD",
+    "keyword": "重要通知"
+  }
+}
+```
+
+**示例4：按时间发送收藏**
+
+```http
+POST /api/robot/send-message
+Authorization: Bearer {token}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "客户群",
+    "locatorType": "TIME",
+    "timePattern": "2024-01-15"
+  }
+}
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "指令已下发",
+  "data": {
+    "commandId": "cmd_1703123456789_abc123",
+    "status": "pending"
+  }
+}
+```
+
+**执行结果回调**（如果配置了结果回调）：
+```http
+POST {第三方结果回调地址}
+Content-Type: application/json
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandId": "cmd_1703123456789_abc123",
+  "commandType": 900,
+  "errorCode": 0,
+  "errorReason": "",
+  "runTime": 1666238534935,
+  "timeCost": 3.5,
+  "successList": ["工作群"],
+  "failList": []
+}
+```
+
+**注意事项**：
+- 群发或私发通过 `targetChat` 的值区分：如果是群名则群发，如果是人名则私发
+- `index` 从 0 开始，0 表示第1条收藏
+- 按关键词搜索时，会匹配收藏标题或内容中包含该关键词的收藏（取最新的一条）
+- 按时间定位时，会匹配该日期收藏的收藏（取最新的一条）
+- APP 需要有访问企业微信收藏夹的权限
 
 ### 消息类型定义（textType）
 

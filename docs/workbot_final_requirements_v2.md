@@ -850,6 +850,75 @@ WorkBot支持以下消息类型供第三方平台调用：
 | 221 | 添加待办 | 给内部成员添加待办 | titleList, receivedContent |
 | 226 | 撤回消息 | 撤回机器人发送的消息 | titleList, originalContent, textType |
 | 234 | 删除联系人 | 删除指定联系人 | friend |
+| 900 | 收藏消息 | 从收藏夹中选取收藏并发送 | targetChat, locatorType, index/keyword/timePattern |
+
+#### 收藏消息指令（type=900）
+
+从企业微信收藏夹中选取收藏的消息并发送到指定的群或好友。
+
+**请求格式**：
+```http
+POST /api/robot/send-message
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",
+    "locatorType": "INDEX",
+    "index": 0
+  }
+}
+```
+
+**参数说明**：
+
+| 参数 | 类型 | 必填 | 说明 | 示例 |
+|------|------|------|------|------|
+| commandType | integer | 是 | 指令类型，固定值 900 | 900 |
+| targetChat | string | 是 | 目标接收者：群名或人名 | `"工作群"`（群发）或 `"张三"`（私发） |
+| locatorType | string | 是 | 定位收藏的方式 | `"INDEX"`、`"KEYWORD"`、`"TIME"` |
+| index | integer | 否 | 按索引定位时的收藏序号（从0开始） | 0 = 第1条，1 = 第2条 |
+| keyword | string | 否 | 按关键词搜索收藏 | `"重要通知"` |
+| timePattern | string | 否 | 按时间定位收藏 | `"2024-01-15"` |
+
+**locatorType 说明**：
+
+| 值 | 说明 | 配合参数 |
+|----|------|----------|
+| INDEX | 按索引定位 | index（从0开始，0表示第1条收藏） |
+| KEYWORD | 按关键词搜索收藏 | keyword（匹配收藏标题或内容） |
+| TIME | 按时间定位收藏 | timePattern（匹配收藏时间） |
+
+**示例**：
+
+**发送第1条收藏到群聊**：
+```json
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",
+    "locatorType": "INDEX",
+    "index": 0
+  }
+}
+```
+
+**按关键词搜索并发送收藏**：
+```json
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "客服群",
+    "locatorType": "KEYWORD",
+    "keyword": "重要通知"
+  }
+}
+```
 
 ### 安全机制
 

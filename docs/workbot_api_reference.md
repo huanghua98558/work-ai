@@ -481,6 +481,79 @@ Authorization: Bearer {token}
 }
 ```
 
+**请求参数（收藏消息）**：
+```json
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",
+    "locatorType": "INDEX",
+    "index": 0
+  }
+}
+```
+
+**收藏消息参数说明**：
+
+| 参数 | 类型 | 必填 | 说明 | 示例 |
+|------|------|------|------|------|
+| commandType | integer | 是 | 指令类型，固定值 900 | 900 |
+| targetChat | string | 是 | 目标接收者：群名或人名 | `"工作群"`（群发）或 `"张三"`（私发） |
+| locatorType | string | 是 | 定位收藏的方式 | `"INDEX"`、`"KEYWORD"`、`"TIME"` |
+| index | integer | 否 | 按索引定位时的收藏序号（从0开始） | 0 = 第1条，1 = 第2条 |
+| keyword | string | 否 | 按关键词搜索收藏 | `"重要通知"` |
+| timePattern | string | 否 | 按时间定位收藏 | `"2024-01-15"` |
+
+**locatorType 说明**：
+
+| 值 | 说明 | 配合参数 |
+|----|------|----------|
+| INDEX | 按索引定位 | index（从0开始，0表示第1条收藏） |
+| KEYWORD | 按关键词搜索收藏 | keyword（匹配收藏标题或内容） |
+| TIME | 按时间定位收藏 | timePattern（匹配收藏时间） |
+
+**收藏消息示例**：
+
+**示例1：发送第1条收藏到群聊**
+```json
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",
+    "locatorType": "INDEX",
+    "index": 0
+  }
+}
+```
+
+**示例2：发送第5条收藏到好友**
+```json
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "张三",
+    "locatorType": "INDEX",
+    "index": 4
+  }
+}
+```
+
+**示例3：按关键词搜索并发送收藏**
+```json
+{
+  "robotId": "robot_1703123456789_abc123",
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "客服群",
+    "locatorType": "KEYWORD",
+    "keyword": "重要通知"
+  }
+}
+```
+
 **响应**：
 ```json
 {
