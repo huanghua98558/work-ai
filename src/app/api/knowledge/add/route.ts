@@ -1,5 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getKnowledgeService } from "@/lib/knowledge-service";
+import {
+  withErrorHandling,
+  successResponse,
+  validateParams,
+  ValidationError,
+} from "@/lib/error-handler";
 import { z } from "zod";
 
 const addContentSchema = z.object({
@@ -13,89 +19,44 @@ const addUrlSchema = z.object({
 });
 
 /**
- * 添加文本内容到知识库
+ * 添加内容到知识库
  */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { type } = body;
+export const POST = withErrorHandling(async (request: NextRequest) => {
+  const body = await request.json();
+  const { type } = body;
 
-    if (type === 'url') {
-      // 添加 URL
-      const validatedData = addUrlSchema.parse(body);
-      const { url, dataset } = validatedData;
+  if (type === 'url') {
+    // 添加 URL
+    const validatedData = validateParams(addUrlSchema, body);
+    const { url, dataset } = validatedData as z.infer<typeof addUrlSchema>;
 
-      const knowledgeService = getKnowledgeService(dataset);
-      const success = await knowledgeService.addUrl(url);
+    const knowledgeService = getKnowledgeService(dataset);
+    const success = await knowledgeService.addUrl(url);
 
-      if (success) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            message: "URL 导入成功",
-            url,
-            dataset,
-          },
-        });
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "URL 导入失败",
-            code: "IMPORT_FAILED",
-          },
-          { status: 500 }
-        );
-      }
+    if (success) {
+      return successResponse({
+        message: "URL 导入成功",
+        url,
+        dataset,
+      });
     } else {
-      // 添加文本
-      const validatedData = addContentSchema.parse(body);
-      const { content, dataset } = validatedData;
-
-      const knowledgeService = getKnowledgeService(dataset);
-      const success = await knowledgeService.addContent(content);
-
-      if (success) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            message: "内容导入成功",
-            dataset,
-          },
-        });
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "内容导入失败",
-            code: "IMPORT_FAILED",
-          },
-          { status: 500 }
-        );
-      }
+      throw new ValidationError("URL 导入失败");
     }
-  } catch (error: any) {
-    console.error("知识库导入错误:", error);
+  } else {
+    // 添加文本
+    const validatedData = validateParams(addContentSchema, body);
+    const { content, dataset } = validatedData as z.infer<typeof addContentSchema>;
 
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "请求参数错误",
-          details: error.errors,
-          code: "INVALID_PARAMS",
-        },
-        { status: 400 }
-      );
+    const knowledgeService = getKnowledgeService(dataset);
+    const success = await knowledgeService.addContent(content);
+
+    if (success) {
+      return successResponse({
+        message: "内容导入成功",
+        dataset,
+      });
+    } else {
+      throw new ValidationError("内容导入失败");
     }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "知识库导入失败",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
   }
-}
+});

@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getDatabase } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import {
+  withErrorHandling,
+  successResponse,
+  validateParams,
+  NotFoundError,
+} from "@/lib/error-handler";
 import { z } from "zod";
 
 const configSchema = z.object({
@@ -14,11 +20,11 @@ const configSchema = z.object({
 /**
  * 获取机器人配置
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ robotId: string }> }
-) {
-  try {
+export const GET = withErrorHandling(
+  async (
+    request: NextRequest,
+    { params }: { params: Promise<{ robotId: string }> }
+  ) => {
     const { robotId } = await params;
 
     const db = await getDatabase();
@@ -30,49 +36,26 @@ export async function GET(
     `);
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "机器人不存在",
-          code: "ROBOT_NOT_FOUND",
-        },
-        { status: 404 }
-      );
+      throw new NotFoundError('机器人');
     }
 
     const config = result.rows[0].config || {};
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        config,
-      },
-    });
-  } catch (error: any) {
-    console.error("获取机器人配置错误:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "获取机器人配置失败",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return successResponse({ config });
   }
-}
+);
 
 /**
  * 更新机器人配置
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ robotId: string }> }
-) {
-  try {
+export const PUT = withErrorHandling(
+  async (
+    request: NextRequest,
+    { params }: { params: Promise<{ robotId: string }> }
+  ) => {
     const { robotId } = await params;
     const body = await request.json();
-    const validatedData = configSchema.parse(body);
+    const validatedData = validateParams(configSchema, body);
 
     const db = await getDatabase();
 
@@ -84,18 +67,11 @@ export async function PUT(
     `);
 
     if (currentResult.rows.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "机器人不存在",
-          code: "ROBOT_NOT_FOUND",
-        },
-        { status: 404 }
-      );
+      throw new NotFoundError('机器人');
     }
 
     const currentConfig = currentResult.rows[0].config || {};
-    const newConfig = { ...currentConfig, ...validatedData };
+    const newConfig = { ...currentConfig, ...(validatedData as Record<string, any>) };
 
     // 更新配置
     await db.execute(sql`
@@ -104,35 +80,9 @@ export async function PUT(
       WHERE robot_id = ${robotId}
     `);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        config: newConfig,
-        message: "机器人配置更新成功",
-      },
+    return successResponse({
+      config: newConfig,
+      message: "机器人配置更新成功",
     });
-  } catch (error: any) {
-    console.error("更新机器人配置错误:", error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "请求参数错误",
-          details: error.errors,
-          code: "INVALID_PARAMS",
-        },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "更新机器人配置失败",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
   }
-}
+);
