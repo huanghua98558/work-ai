@@ -199,9 +199,105 @@ users:
 - **手动绑定**：激活码生成后，管理员编辑选择绑定用户
 
 ### 使用规则
-- 一码一设备（防止滥用）
-- 同一设备可多次激活（卸载重装）
-- 不同设备不能使用同一激活码
+- **一码一设备**：防止滥用
+- **同一设备可多次激活**：卸载重装后可以用同一个激活码重新激活
+- **不同设备不能使用同一激活码**：激活码只能绑定一个deviceId
+- **同一激活码，同一设备，可以无限次激活**：只要deviceId不变
+
+### APP激活流程
+
+#### 完整流程
+```
+1. 用户在APP输入激活码
+   ↓
+2. APP获取设备信息（deviceInfo）
+   ├─ deviceId：系统提供的唯一标识
+   │  ├─ Android：Settings.Secure.ANDROID_ID
+   │  └─ iOS：UIDevice.current.identifierForVendor
+   ├─ model：设备型号（如：Samsung Galaxy S21）
+   ├─ os：操作系统（Android/iOS）
+   ├─ osVersion：系统版本（如：12）
+   ├─ manufacturer：厂商（如：Samsung）
+   ├─ network：网络类型（4G/WiFi）
+   ├─ appVersion：APP版本（如：1.0.0）
+   ├─ totalMemory：内存大小（MB）
+   └─ screenResolution：屏幕分辨率（如：1080x2400）
+   ↓
+3. APP调用 POST /api/robot-ids/activate
+   输入：
+   {
+     "code": "3CQ4Z9LE",
+     "deviceInfo": {
+       "deviceId": "device-001",
+       "model": "Samsung Galaxy S21",
+       "os": "Android",
+       "osVersion": "12",
+       "manufacturer": "Samsung",
+       "network": "4G",
+       "appVersion": "1.0.0",
+       "totalMemory": 8192,
+       "screenResolution": "1080x2400"
+     }
+   }
+   ↓
+4. 服务器验证激活码 + 设备绑定
+   ├─ 检查激活码是否存在
+   ├─ 检查激活码是否已过期
+   ├─ 检查激活码是否已使用
+   ├─ 如果已使用，检查是否绑定到同一个设备（deviceId）
+   │  ├─ 如果绑定到不同设备 → ❌ 返回错误："激活码已绑定到其他设备"
+   │  └─ 如果绑定到同一个设备 → ✅ 允许重新激活
+   ├─ 生成robotId（随机生成）
+   ├─ 生成token（JWT）
+   ├─ 激活码绑定到该deviceId
+   └─ 保存设备信息
+   ↓
+5. 服务器返回
+   输出：
+   {
+     "success": true,
+     "code": 0,
+     "data": {
+       "robotId": "RBml9n7nikHIMZU0",
+       "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+     }
+   }
+   ↓
+6. APP保存robotId和token到本地
+   ↓
+7. APP开始与服务器建立正式通讯（WebSocket）
+```
+
+### deviceId管理
+
+#### deviceId获取方式
+- **Android**：使用 `Settings.Secure.ANDROID_ID`
+- **iOS**：使用 `UIDevice.current.identifierForVendor`
+- **特点**：系统提供的唯一标识，卸载重装后不变
+
+#### deviceId的作用
+- **设备绑定**：实现"一码一设备"
+- **设备识别**：区分不同设备
+- **防滥用**：防止同一激活码在多个设备上使用
+- **设备统计**：统计设备型号分布
+
+### 设备变更处理
+
+#### 场景1：卸载重装
+- 用户卸载APP后重新安装
+- deviceId不变
+- ✅ 可以用同一个激活码重新激活
+
+#### 场景2：刷机、改机、更换设备
+- 用户修改了deviceId（使用改机软件、刷机、更换设备）
+- 检测到deviceId变化
+- ❌ 激活失败："激活码已绑定到其他设备"
+
+#### 解决方案：管理员解绑
+1. 用户联系管理员
+2. 管理员在后台查看激活码绑定情况
+3. 管理员执行"解绑设备"操作
+4. 用户可以使用激活码在新设备上激活
 
 ### 定价
 | 有效期 | 价格 |
@@ -237,6 +333,10 @@ users:
 │
 ├─ 激活码操作
 │   ├─ 修改绑定用户（重新分配）
+│   ├─ 解绑设备（允许更换设备）
+│   │  ├─ 查看绑定的设备信息
+│   │  ├─ 执行解绑操作
+│   │  └─ 解绑后可在新设备上激活
 │   ├─ 查看激活状态
 │   └─ 导出激活码列表
 │
@@ -384,30 +484,7 @@ AI配置：
 
 ### HTTP接口
 
-#### 1. 验证激活码
-- **接口**：`POST /api/robot-ids/verify`
-- **请求**：
-```json
-{
-  "code": "3CQ4Z9LE",
-  "deviceId": "device-001"
-}
-```
-- **响应**：
-```json
-{
-  "success": true,
-  "code": 0,
-  "data": {
-    "valid": true,
-    "robotId": "RBml9n7nikHIMZU0",
-    "status": "unused",
-    "canActivate": true
-  }
-}
-```
-
-#### 2. 激活机器人
+#### 1. 激活机器人
 - **接口**：`POST /api/robot-ids/activate`
 - **请求**：
 ```json
@@ -433,16 +510,12 @@ AI配置：
   "code": 0,
   "data": {
     "robotId": "RBml9n7nikHIMZU0",
-    "robotUuid": "uuid-xxx",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "refresh-token-xxx",
-    "expiresAt": "2026-02-13T10:00:00Z",
-    "wsUrl": "wss://your-domain.coze.site/ws/connect"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```
 
-#### 3. 发送心跳
+#### 2. 发送心跳
 - **接口**：`POST /api/heartbeat`
 - **请求头**：`Authorization: Bearer {token}`
 - **请求**：
@@ -456,7 +529,7 @@ AI配置：
 }
 ```
 
-#### 4. 上报结果
+#### 3. 上报结果
 - **接口**：`POST /api/result`
 - **请求头**：`Authorization: Bearer {token}`
 - **请求**：
@@ -1032,6 +1105,7 @@ CREATE INDEX idx_ai_calls_created_at ON ai_calls(created_at);
 | 2001 | 激活码无效 |
 | 2002 | 激活码已使用 |
 | 2003 | 激活码已过期 |
+| 2004 | 激活码已绑定到其他设备 |
 | 3001 | 机器人不存在 |
 | 3002 | 机器人已激活 |
 | 3003 | 设备不匹配 |
