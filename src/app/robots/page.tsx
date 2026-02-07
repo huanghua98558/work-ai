@@ -33,23 +33,27 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Robot {
   id: number;
   robotId: string;
   name: string;
+  nickname?: string;
   status: 'online' | 'offline';
   aiMode: 'builtin' | 'third_party';
   aiProvider: string;
   totalMessages: number;
   lastActiveAt: string;
   createdAt: string;
+  boundAt: string;
 }
 
 export default function RobotsPage() {
   const [robots, setRobots] = useState<Robot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [selectedRobot, setSelectedRobot] = useState<Robot | null>(null);
   const [configData, setConfigData] = useState({
@@ -59,6 +63,83 @@ export default function RobotsPage() {
     enableStreamResponse: true,
     temperature: 0.7,
   });
+
+  // 加载机器人列表
+  const loadRobots = async () => {
+    try {
+      setRefreshing(true);
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('未登录');
+        window.location.href = '/login';
+        return;
+      }
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+
+      console.log('开始加载机器人列表...');
+      const response = await fetch('/api/robots', { headers });
+      const data = await response.json();
+
+      console.log('机器人列表API响应:', data);
+
+      if (data.success && data.data) {
+        console.log('机器人数量:', data.data.length);
+
+        // 转换API数据为页面需要的格式
+        const formattedRobots = data.data.map((robot: any, index: number) => {
+          const formatted = {
+            id: robot.id,
+            robotId: robot.bot_id || robot.robotId,
+            name: robot.name,
+            nickname: robot.user_nickname || robot.name,
+            status: robot.status === 'online' ? 'online' : 'offline',
+            aiMode: robot.ai_mode || 'builtin',
+            aiProvider: robot.ai_provider || 'doubao',
+            totalMessages: robot.total_messages || 0,
+            lastActiveAt: robot.last_active_at ? new Date(robot.last_active_at).toLocaleDateString('zh-CN') : '-',
+            createdAt: new Date(robot.created_at).toLocaleDateString('zh-CN'),
+            boundAt: robot.bound_at ? new Date(robot.bound_at).toLocaleDateString('zh-CN') : '-',
+          };
+          console.log(`机器人[${index}]:`, formatted);
+          return formatted;
+        });
+
+        console.log('设置机器人列表:', formattedRobots.length, '个');
+        setRobots(formattedRobots);
+      } else {
+        console.error('API返回失败:', data);
+      }
+    } catch (error) {
+      console.error('加载机器人列表失败:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRobots();
+  }, []);
+
+  // 每次页面显示时重新加载数据
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadRobots();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   const handleSaveConfig = () => {
     console.log('Saving config:', configData);
@@ -76,63 +157,6 @@ export default function RobotsPage() {
     });
     setConfigDialogOpen(true);
   };
-
-  useEffect(() => {
-    // 加载真实数据
-    const loadRobots = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.error('未登录');
-          window.location.href = '/login';
-          return;
-        }
-
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        };
-
-        console.log('开始加载机器人列表...');
-        const response = await fetch('/api/robots', { headers });
-        const data = await response.json();
-
-        console.log('机器人列表API响应:', data);
-
-        if (data.success && data.data) {
-          console.log('机器人数量:', data.data.length);
-
-          // 转换API数据为页面需要的格式
-          const formattedRobots = data.data.map((robot: any, index: number) => {
-            const formatted = {
-              id: robot.id,
-              robotId: robot.bot_id || robot.robotId,
-              name: robot.name,
-              status: robot.status === 'online' ? 'online' : 'offline',
-              aiMode: robot.ai_mode || 'builtin',
-              aiProvider: robot.ai_provider || 'doubao',
-              totalMessages: robot.total_messages || 0,
-              lastActiveAt: robot.last_active_at ? new Date(robot.last_active_at).toLocaleDateString('zh-CN') : '-',
-              createdAt: new Date(robot.created_at).toLocaleDateString('zh-CN'),
-            };
-            console.log(`机器人[${index}]:`, formatted);
-            return formatted;
-          });
-
-          console.log('设置机器人列表:', formattedRobots.length, '个');
-          setRobots(formattedRobots);
-        } else {
-          console.error('API返回失败:', data);
-        }
-      } catch (error) {
-        console.error('加载机器人列表失败:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadRobots();
-  }, []);
 
   if (loading) {
     return (
@@ -222,11 +246,25 @@ export default function RobotsPage() {
         {/* 机器人列表 */}
         <Card className="border-2 border-blue-100 dark:border-blue-900">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-blue-600" />
-              机器人列表
-            </CardTitle>
-            <CardDescription>管理所有已创建的机器人</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-blue-600" />
+                  机器人列表
+                </CardTitle>
+                <CardDescription>管理所有已创建的机器人</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadRobots()}
+                disabled={loading || refreshing}
+                className="bg-white dark:bg-gray-800"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? '刷新中...' : '刷新'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             {robots.length === 0 ? (
@@ -250,14 +288,23 @@ export default function RobotsPage() {
                       <TableHead>状态</TableHead>
                       <TableHead>消息数</TableHead>
                       <TableHead>最后活跃</TableHead>
-                      <TableHead>创建时间</TableHead>
+                      <TableHead>绑定时间</TableHead>
                       <TableHead>操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {robots.map((robot) => (
                       <TableRow key={robot.id}>
-                        <TableCell className="font-medium">{robot.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {robot.nickname && robot.nickname !== robot.name ? (
+                            <div>
+                              <div className="font-medium">{robot.nickname}</div>
+                              <div className="text-xs text-gray-500">{robot.name}</div>
+                            </div>
+                          ) : (
+                            robot.name
+                          )}
+                        </TableCell>
                         <TableCell>
                           <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                             {robot.robotId}
@@ -285,10 +332,15 @@ export default function RobotsPage() {
                             {robot.lastActiveAt}
                           </div>
                         </TableCell>
-                        <TableCell>{robot.createdAt}</TableCell>
+                        <TableCell>{robot.boundAt}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" className="text-blue-600">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-600"
+                              onClick={() => openConfigDialog(robot)}
+                            >
                               <Settings className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="sm" className="text-green-600">
