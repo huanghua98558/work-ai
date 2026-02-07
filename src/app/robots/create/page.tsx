@@ -8,30 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Bot, ArrowLeft, Save, Key, Copy, CheckCircle2 } from 'lucide-react';
+import { Bot, ArrowLeft, Key } from 'lucide-react';
 
 export default function CreateRobotPage() {
   const router = useRouter();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
-  const [createdRobot, setCreatedRobot] = useState<any>(null);
-  const [activationCode, setActivationCode] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    autoGenerateCode: true, // 默认自动生成激活码
-    validityPeriod: '365', // 默认有效期1年
+    activationCode: '', // 激活码
+    robotId: '', // 机器人ID
+    bindType: 'activationCode', // 绑定类型：activationCode 或 robotId
   });
 
   const handleChange = (field: string, value: any) => {
@@ -41,19 +31,6 @@ export default function CreateRobotPage() {
     }));
   };
 
-  const copyActivationCode = () => {
-    if (activationCode) {
-      navigator.clipboard.writeText(activationCode);
-      setCopied(true);
-      toast({
-        title: '复制成功',
-        description: '激活码已复制到剪贴板',
-        variant: 'success',
-      });
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -61,6 +38,25 @@ export default function CreateRobotPage() {
       toast({
         title: '验证失败',
         description: '请输入机器人名称',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // 验证激活码或机器人ID
+    if (formData.bindType === 'activationCode' && !formData.activationCode.trim()) {
+      toast({
+        title: '验证失败',
+        description: '请输入激活码',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.bindType === 'robotId' && !formData.robotId.trim()) {
+      toast({
+        title: '验证失败',
+        description: '请输入机器人ID',
         variant: 'destructive',
       });
       return;
@@ -80,11 +76,13 @@ export default function CreateRobotPage() {
       const requestBody: any = {
         name: formData.name,
         description: formData.description,
-        autoGenerateCode: formData.autoGenerateCode,
       };
 
-      if (formData.autoGenerateCode) {
-        requestBody.validityPeriod = parseInt(formData.validityPeriod);
+      // 根据绑定类型添加对应字段
+      if (formData.bindType === 'activationCode') {
+        requestBody.activationCode = formData.activationCode;
+      } else {
+        requestBody.robotId = formData.robotId;
       }
 
       const response = await fetch('/api/robots', {
@@ -96,19 +94,16 @@ export default function CreateRobotPage() {
       const data = await response.json();
 
       if (data.success) {
-        setCreatedRobot(data.data.robot);
-        setActivationCode(data.data.activationCode?.code || null);
-        
         toast({
           title: '创建成功',
-          description: `机器人 "${formData.name}" 已成功创建！`,
+          description: `机器人 "${formData.name}" 已成功绑定！`,
           variant: 'success',
         });
 
-        // 如果生成了激活码，跳转到机器人列表
+        // 跳转到机器人列表
         setTimeout(() => {
           router.push('/robots');
-        }, 3000);
+        }, 1500);
       } else {
         toast({
           title: '创建失败',
@@ -128,277 +123,174 @@ export default function CreateRobotPage() {
     }
   };
 
-  // 创建成功显示激活码
-  if (createdRobot && activationCode) {
-    return (
-      <MainLayout>
-        <div className="space-y-6 max-w-2xl mx-auto">
-          {/* 成功页面 */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 dark:from-green-900 dark:via-emerald-900 dark:to-teal-900 p-8">
-            <div className="relative">
-              <CheckCircle2 className="h-16 w-16 text-white mb-4" />
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                创建成功！
-              </h1>
-              <p className="text-xl text-green-100">
-                机器人 "{createdRobot.name}" 已创建，激活码已生成
-              </p>
-            </div>
-          </div>
-
-          {/* 激活码卡片 */}
-          <Card className="border-2 border-green-100 dark:border-green-900">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-green-600" />
-                机器人信息
-              </CardTitle>
-              <CardDescription>复制机器人和激活码，用于激活和绑定</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              {/* 机器人ID */}
-              <div className="space-y-2">
-                <Label htmlFor="robotId">机器人ID</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="robotId"
-                    value={createdRobot.bot_id}
-                    readOnly
-                    className="font-mono text-sm"
-                  />
-                  <Button
-                    onClick={() => {
-                      navigator.clipboard.writeText(createdRobot.bot_id);
-                      toast({
-                        title: '复制成功',
-                        description: '机器人ID已复制到剪贴板',
-                        variant: 'success',
-                      });
-                    }}
-                    size="icon"
-                    variant="outline"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  20位随机字符（数字、大小写字母），用于在后台添加机器人
-                </p>
-              </div>
-
-              {/* 激活码 */}
-              <div className="space-y-2">
-                <Label htmlFor="activationCode">激活码</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="activationCode"
-                    value={activationCode}
-                    readOnly
-                    className="font-mono text-lg text-center"
-                  />
-                  <Button
-                    onClick={copyActivationCode}
-                    size="icon"
-                    variant="outline"
-                  >
-                    {copied ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  用于在APP上激活机器人，激活后获取通讯码
-                </p>
-              </div>
-
-              {/* 提示信息 */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  📱 用户激活流程：
-                </p>
-                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
-                  <li>用户在APP上输入激活码</li>
-                  <li>APP向服务器验证激活码</li>
-                  <li>验证成功后返回机器人ID和通讯码</li>
-                  <li>APP保存机器人和通讯码，开始使用</li>
-                </ol>
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 pt-2">
-                  💻 后台绑定流程：
-                </p>
-                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
-                  <li>在添加机器人时输入机器人ID或激活码</li>
-                  <li>系统自动绑定机器人到用户</li>
-                  <li>用户可以管理绑定的机器人</li>
-                </ol>
-              </div>
-
-              <Button
-                onClick={() => router.push('/robots')}
-                className="w-full"
-              >
-                返回机器人列表
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout>
-      <div className="space-y-6 max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto space-y-6">
         {/* 页面标题 */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-900 dark:via-indigo-900 dark:to-purple-900 p-8">
-          <div className="relative">
-            <Button
-              variant="ghost"
-              className="mb-4 text-white hover:bg-white/10"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              返回
-            </Button>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-              创建新机器人
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+              绑定机器人
             </h1>
-            <p className="text-xl text-blue-100">
-              一步到位：创建机器人 + 生成激活码
+            <p className="text-gray-500 dark:text-gray-400">
+              通过激活码或机器人ID绑定机器人到您的服务器
             </p>
           </div>
         </div>
 
         {/* 创建表单 */}
         <Card className="border-2 border-blue-100 dark:border-blue-900">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-blue-600" />
-              基本信息
+              机器人信息
             </CardTitle>
-            <CardDescription>填写机器人信息，系统将自动生成激活码</CardDescription>
+            <CardDescription>
+              填写机器人基本信息和绑定信息
+            </CardDescription>
           </CardHeader>
-          <CardContent className="p-6 space-y-6">
+          <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* 机器人名称 */}
               <div className="space-y-2">
-                <Label htmlFor="name">
-                  机器人名称 <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="name">机器人名称 *</Label>
                 <Input
                   id="name"
-                  placeholder="例如：客服机器人、企业助手"
                   value={formData.name}
                   onChange={(e) => handleChange('name', e.target.value)}
+                  placeholder="输入机器人名称"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500">
-                  建议使用简洁明确的名称，方便后续管理
-                </p>
               </div>
 
-              {/* 描述 */}
+              {/* 机器人描述 */}
               <div className="space-y-2">
-                <Label htmlFor="description">描述（可选）</Label>
+                <Label htmlFor="description">机器人描述</Label>
                 <Textarea
                   id="description"
-                  placeholder="描述机器人的用途和特点"
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
-                  disabled={loading}
+                  placeholder="输入机器人描述（可选）"
                   rows={3}
-                />
-                <p className="text-xs text-gray-500">
-                  帮助团队成员了解机器人的用途
-                </p>
-              </div>
-
-              <hr className="border-gray-200 dark:border-gray-800" />
-
-              {/* 自动生成激活码 */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="autoGenerateCode" className="text-base">
-                    自动生成激活码
-                  </Label>
-                  <p className="text-xs text-gray-500">
-                    创建机器人后自动生成激活码并绑定
-                  </p>
-                </div>
-                <Switch
-                  id="autoGenerateCode"
-                  checked={formData.autoGenerateCode}
-                  onCheckedChange={(checked) => handleChange('autoGenerateCode', checked)}
                   disabled={loading}
                 />
               </div>
 
-              {/* 有效期（如果自动生成激活码） */}
-              {formData.autoGenerateCode && (
-                <div className="space-y-2">
-                  <Label htmlFor="validityPeriod">激活码有效期</Label>
-                  <Select
-                    value={formData.validityPeriod}
-                    onValueChange={(value) => handleChange('validityPeriod', value)}
-                    disabled={loading}
+              {/* 绑定类型选择 */}
+              <div className="space-y-2">
+                <Label>绑定方式 *</Label>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => handleChange('bindType', 'activationCode')}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                      formData.bindType === 'activationCode'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                    }`}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择有效期" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">1个月</SelectItem>
-                      <SelectItem value="180">6个月</SelectItem>
-                      <SelectItem value="365">1年</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div className="flex items-center gap-2 justify-center">
+                      <Key className="h-5 w-5" />
+                      <span className="font-medium">激活码</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      输入激活码绑定机器人
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleChange('bindType', 'robotId')}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                      formData.bindType === 'robotId'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 justify-center">
+                      <Bot className="h-5 w-5" />
+                      <span className="font-medium">机器人ID</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      输入机器人ID直接绑定
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* 激活码输入 */}
+              {formData.bindType === 'activationCode' && (
+                <div className="space-y-2">
+                  <Label htmlFor="activationCode">激活码 *</Label>
+                  <Input
+                    id="activationCode"
+                    value={formData.activationCode}
+                    onChange={(e) => handleChange('activationCode', e.target.value.toUpperCase())}
+                    placeholder="输入8位激活码"
+                    className="font-mono text-lg text-center"
+                    disabled={loading}
+                  />
                   <p className="text-xs text-gray-500">
-                    激活码的有效时长，过期后需要重新生成
+                    请输入您购买的激活码或管理员提供的激活码
                   </p>
                 </div>
               )}
 
+              {/* 机器人ID输入 */}
+              {formData.bindType === 'robotId' && (
+                <div className="space-y-2">
+                  <Label htmlFor="robotId">机器人ID *</Label>
+                  <Input
+                    id="robotId"
+                    value={formData.robotId}
+                    onChange={(e) => handleChange('robotId', e.target.value)}
+                    placeholder="输入20位机器人ID"
+                    className="font-mono"
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-gray-500">
+                    20位随机字符（数字、大小写字母）
+                  </p>
+                </div>
+              )}
+
+              {/* 提示信息 */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  💡 使用说明：
+                </p>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 mt-2 list-disc list-inside">
+                  <li>激活码通过购买或管理员创建获得</li>
+                  <li>激活成功后会自动创建或绑定机器人</li>
+                  <li>机器人ID可在激活成功后获得</li>
+                </ul>
+              </div>
+
               {/* 提交按钮 */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.back()}
                   disabled={loading}
+                  className="flex-1"
                 >
                   取消
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1"
                   disabled={loading}
+                  className="flex-1"
                 >
-                  {loading ? '创建中...' : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      创建机器人{formData.autoGenerateCode ? '并生成激活码' : ''}
-                    </>
-                  )}
+                  {loading ? '绑定中...' : '绑定机器人'}
                 </Button>
               </div>
-
-              {/* 提示信息 */}
-              {formData.autoGenerateCode ? (
-                <div className="mt-4 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                  <p className="text-sm text-green-900 dark:text-green-100 font-medium">
-                    ✓ 一键完成：创建机器人 + 生成激活码
-                  </p>
-                  <p className="text-sm text-green-800 dark:text-green-200 mt-1">
-                    创建成功后，您可以直接复制激活码使用，无需额外操作
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
-                    ℹ️ 创建后可在激活码管理页面生成激活码
-                  </p>
-                </div>
-              )}
             </form>
           </CardContent>
         </Card>

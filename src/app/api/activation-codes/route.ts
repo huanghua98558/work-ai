@@ -8,7 +8,6 @@ import { z } from "zod";
 
 /**
  * 创建激活码验证 Schema
- * 支持模式A：激活码绑定机器人
  */
 const createActivationCodeSchema = z.object({
   // 激活码有效期（天）
@@ -17,8 +16,6 @@ const createActivationCodeSchema = z.object({
   price: z.string().or(z.number()).transform(String).optional(),
   // 备注
   notes: z.string().optional(),
-  // 激活码类型：admin_dispatch（管理员分发）或 pure_code（纯激活码）
-  type: z.enum(['admin_dispatch', 'pure_code']).default('admin_dispatch'),
   // 最大使用次数（默认1，表示一对一）
   maxUses: z.number().int().positive().default(1),
   // 如果选择绑定已有机器人，提供 robot_id
@@ -46,7 +43,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const type = searchParams.get("type");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
@@ -57,13 +53,8 @@ export async function GET(request: NextRequest) {
     let paramIndex = 1;
 
     if (status) {
-      conditions.push(`status = $${paramIndex++}`);
+      conditions.push(`ac.status = $${paramIndex++}`);
       params.push(status);
-    }
-
-    if (type) {
-      conditions.push(`type = $${paramIndex++}`);
-      params.push(type);
     }
 
     const whereClause = conditions.length > 0
@@ -72,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     // 查询激活码总数
     const countResult = await client.query(
-      `SELECT COUNT(*) as total FROM activation_codes ${whereClause}`,
+      `SELECT COUNT(*) as total FROM activation_codes ac ${whereClause}`,
       params
     );
     const total = parseInt(countResult.rows[0].total);
@@ -213,18 +204,17 @@ export async function POST(request: NextRequest) {
       // 插入激活码（使用实际存在的字段）
       const newCodeResult = await client.query(
         `INSERT INTO activation_codes (
-          code, status, type, max_uses, used_count,
+          code, status, max_uses, used_count,
           remark, created_by, expires_at, robot_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *`,
         [
           code,
           'unused', // 状态：unused（未使用）
-          validatedData.type,
           validatedData.maxUses,
           0, // 已使用次数
-          validatedData.notes || null, // 使用 remark 字段存储 notes
+          validatedData.notes || null,
           user.userId,
           expiresAt.toISOString(),
           validatedData.robotId || null,
