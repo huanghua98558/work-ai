@@ -83,12 +83,33 @@ export default function LoginDebugPage() {
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            登录调试工具
+            调试工具中心
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            用于测试和排查登录问题
+            用于测试和排查系统问题
           </p>
         </div>
+
+        {/* 部署检查卡片 */}
+        <Card className="border-purple-200 bg-purple-50 dark:bg-purple-900/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-600" />
+              部署检查
+            </CardTitle>
+            <CardDescription>
+              检查部署环境和调试页面是否正常
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/api/debug/check-deploy" target="_blank">
+              <Button className="w-full" variant="outline">
+                <Activity className="mr-2 h-4 w-4" />
+                检查部署状态（在新窗口打开）
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
         {/* 系统健康检查卡片 */}
         <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
@@ -103,7 +124,7 @@ export default function LoginDebugPage() {
           </CardHeader>
           <CardContent>
             <Link href="/debug/health">
-              <Button className="w-full">
+              <Button className="w-full" variant="outline">
                 <Activity className="mr-2 h-4 w-4" />
                 打开系统健康检查
               </Button>
