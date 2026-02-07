@@ -9,11 +9,15 @@ export interface JWTPayload {
 }
 
 export function generateAccessToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+  // 移除可能存在的 exp 和 iat 属性，避免与 expiresIn 冲突
+  const { exp, iat, ...cleanPayload } = payload as any;
+  return jwt.sign(cleanPayload, JWT_SECRET, { expiresIn: '30d' });
 }
 
 export function generateRefreshToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '90d' });
+  // 移除可能存在的 exp 和 iat 属性，避免与 expiresIn 冲突
+  const { exp, iat, ...cleanPayload } = payload as any;
+  return jwt.sign(cleanPayload, JWT_SECRET, { expiresIn: '90d' });
 }
 
 export function verifyToken(token: string): JWTPayload | null {
