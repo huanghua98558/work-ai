@@ -95,7 +95,7 @@ export default function ActivationCodesPage() {
   const [viewingCode, setViewingCode] = useState<ActivationCode | null>(null);
 
   // 加载数据
-  const loadData = async () => {
+  const loadData = async (retryCount = 0) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -121,6 +121,68 @@ export default function ActivationCodesPage() {
 
       const codesData = await codesRes.json();
       const robotsData = await robotsRes.json();
+
+      // 检查是否有权限问题（403）
+      if (codesRes.status === 403 || robotsRes.status === 403) {
+        console.log('[激活码管理] 检测到权限不足（403），尝试自动修复');
+
+        // 如果已经重试过，不再重复
+        if (retryCount > 0) {
+          console.log('[激活码管理] 已重试过，仍然权限不足');
+          toast({
+            title: '权限不足',
+            description: '您没有访问激活码管理的权限，请联系管理员',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // 尝试检查并修复角色
+        try {
+          const checkRes = await fetch('/api/auth/check-role', { headers });
+          const checkData = await checkRes.json();
+
+          console.log('[激活码管理] 角色检查结果:', checkData);
+
+          if (checkData.success && checkData.data && !checkData.data.consistent) {
+            // 角色不一致，使用新的 Token 重新加载
+            const newToken = checkData.data.newToken;
+            console.log('[激活码管理] 使用新的 Token 重新加载');
+            localStorage.setItem('token', newToken);
+
+            // 显示提示
+            toast({
+              title: '权限已更新',
+              description: `您的角色已从 ${checkData.data.oldRole} 更新为 ${checkData.data.newRole}，正在重新加载...`,
+              variant: 'default',
+            });
+
+            // 使用新的 Token 重新加载
+            return loadData(retryCount + 1);
+          } else if (checkData.success && checkData.data && checkData.data.consistent) {
+            // 角色一致但仍然没有权限
+            console.log('[激活码管理] 角色一致但仍然没有权限');
+            toast({
+              title: '权限不足',
+              description: '您的角色是普通用户，无法访问激活码管理',
+              variant: 'destructive',
+            });
+            return;
+          }
+        } catch (error) {
+          console.error('[激活码管理] 检查角色失败:', error);
+        }
+
+        // 如果自动修复失败，提示用户重新登录
+        toast({
+          title: '权限不足',
+          description: '请重新登录以获取最新权限',
+          variant: 'destructive',
+        });
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return;
+      }
 
       if (codesData.success) {
         setCodes(codesData.data);
