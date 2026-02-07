@@ -177,9 +177,9 @@ users:
 
 ---
 
-## 四、激活码机制
+## 四、激活码机制与APP通讯
 
-### 分发方式
+### 激活码分发方式
 
 #### 方式1：管理员分发
 - 超级管理员批量生成激活码
@@ -194,9 +194,171 @@ users:
 - 支付成功后自动生成激活码
 - 激活码自动绑定到用户账号
 
-### 绑定方式
+### 激活码绑定方式
 - **自动绑定**：激活码生成时选择绑定用户
 - **手动绑定**：激活码生成后，管理员编辑选择绑定用户
+
+### APP激活流程
+
+#### 激活请求接口
+
+**接口地址**：
+```
+POST /api/robot-ids/activate
+```
+
+**请求参数**：
+```json
+{
+  "code": "3CQ4Z9LE",
+  "deviceInfo": {
+    "deviceId": "9774d56d682e549c",
+    "brand": "Xiaomi",
+    "model": "Mi 10",
+    "os": "Android",
+    "osVersion": "13",
+    "manufacturer": "Xiaomi",
+    "network": "WiFi",
+    "appVersion": "3.0.1",
+    "totalMemory": 8192,
+    "screenResolution": "1080x2400"
+  }
+}
+```
+
+**参数说明**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| code | string | 是 | 激活码（8位，不含I/O，不含0/1） |
+| deviceInfo | object | 是 | 设备信息 |
+| deviceInfo.deviceId | string | 是 | 设备ID（Android: ANDROID_ID, iOS: identifierForVendor） |
+| deviceInfo.brand | string | 是 | 设备品牌 |
+| deviceInfo.model | string | 是 | 设备型号 |
+| deviceInfo.os | string | 是 | 操作系统（Android/iOS） |
+| deviceInfo.osVersion | string | 是 | 系统版本 |
+| deviceInfo.manufacturer | string | 否 | 设备制造商 |
+| deviceInfo.network | string | 否 | 网络类型（WiFi/4G/5G） |
+| deviceInfo.appVersion | string | 否 | APP版本 |
+| deviceInfo.totalMemory | number | 否 | 总内存（MB） |
+| deviceInfo.screenResolution | string | 否 | 屏幕分辨率 |
+
+**响应（201 - 首次激活）**：
+```json
+{
+  "code": 201,
+  "message": "激活成功",
+  "data": {
+    "robotId": "robot_1703123456789_abc123",
+    "robotUuid": "550e8400-e29b-41d4-a716-446655440000",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2025-01-30T12:00:00.000Z",
+    "isNewActivation": true
+  }
+}
+```
+
+**响应（200 - 同设备重复激活）**：
+```json
+{
+  "code": 200,
+  "message": "激活成功（已更新Token）",
+  "data": {
+    "robotId": "robot_1703123456789_abc123",
+    "robotUuid": "550e8400-e29b-41d4-a716-446655440000",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2025-01-30T12:00:00.000Z",
+    "isNewActivation": false
+  }
+}
+```
+
+**响应（409 - 激活码已被其他设备使用）**：
+```json
+{
+  "code": 409,
+  "message": "激活码已被其他设备使用，请联系管理员解绑",
+  "data": {
+    "existingDeviceId": "other-device-id",
+    "existingRobotId": "robot_xxx",
+    "activatedAt": "2024-12-01T10:00:00.000Z"
+  }
+}
+```
+
+**响应（403/404 - 激活码无效）**：
+```json
+{
+  "code": 404,
+  "message": "激活码不存在"
+}
+```
+
+### 激活逻辑说明
+
+| 场景 | 处理方式 | 返回码 |
+|------|----------|--------|
+| 首次激活 | 创建新记录，生成 Token | 201 |
+| 同设备重复激活 | 更新 Token，返回 isNewActivation=false | 200 |
+| 跨设备使用 | 拒绝，提示联系管理员解绑 | 409 |
+| 激活码不存在 | 拒绝 | 404 |
+| 激活码已禁用/过期 | 拒绝 | 403 |
+| 参数错误 | 拒绝 | 400 |
+
+### Token 管理
+
+**Token 类型**：
+- **Access Token**：用于API请求认证，有效期30天
+- **Refresh Token**：用于刷新Access Token，有效期90天
+
+**Token 使用**：
+所有API请求需要在Header中携带Token：
+```http
+Authorization: Bearer {access_token}
+```
+
+**Token 刷新**：
+当Access Token过期时，使用Refresh Token获取新的Access Token：
+```http
+POST /api/robot/refresh-token
+Content-Type: application/json
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### 设备解绑（管理员功能）
+
+管理员可以解绑设备，允许新设备激活：
+
+```http
+POST /api/admin/unbind-device
+Content-Type: application/json
+Authorization: Bearer {admin_token}
+
+{
+  "code": "3CQ4Z9LE",
+  "reason": "用户更换设备",
+  "adminId": "admin_123"
+}
+```
+
+### WebSocket连接
+
+APP激活成功后，通过WebSocket与服务器保持长连接：
+
+**连接地址**：
+```
+wss://your-domain.coze.site/ws?robotId={robotId}&token={token}
+```
+
+**心跳机制**：
+- APP每30秒发送一次心跳
+- 服务器回应心跳
+- 超过60秒无心跳，判定为离线
 
 ### 使用规则
 - **一码一设备**：防止滥用
@@ -477,6 +639,262 @@ AI配置：
   ├─ 内置AI → AI生成回复 → WorkBot → APP → 企业微信
   └─ 第三方平台 → 回调第三方 → 第三方处理 → WorkBot → APP → 企业微信
 ```
+
+### 消息处理详细流程
+
+#### 1. APP接收企业微信消息
+
+当企业微信APP收到消息时，WorkBot APP会捕获消息并通过HTTP/WebSocket发送到服务器：
+
+```http
+POST /api/robot/messages
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "spoken": "你好啊",
+  "rawSpoken": "@机器人 你好啊",
+  "receivedName": "张三",
+  "groupName": "测试群1",
+  "groupRemark": "测试群1备注名",
+  "roomType": 1,
+  "atMe": true,
+  "textType": 1,
+  "fileBase64": "iVBORxxx==",
+  "timestamp": "2024-12-01T10:30:00Z"
+}
+```
+
+**参数说明**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| robotId | string | 机器人ID |
+| spoken | string | 问题文本（去掉@机器人） |
+| rawSpoken | string | 原始问题文本 |
+| receivedName | string | 提问者名称 |
+| groupName | string | QA所在群名（群聊） |
+| groupRemark | string | QA所在群备注名 |
+| roomType | integer | 房间类型：1=外部群 2=外部联系人 3=内部群 4=内部联系人 |
+| atMe | boolean | 是否@机器人（群聊） |
+| textType | integer | 消息类型：0=未知 1=文本 2=图片 3=语音 5=视频 7=小程序 8=链接 9=文件 |
+| fileBase64 | string | 图片base64 (png)，仅textType=2时存在 |
+| timestamp | string | 消息时间戳（ISO 8601） |
+
+#### 2. WorkBot服务器处理消息
+
+服务器收到消息后：
+
+1. **验证Token**：验证请求的合法性
+2. **查询机器人配置**：获取机器人的AI回复模式
+3. **判断处理方式**：
+   - **内置AI模式**：直接调用LLM技能生成回复
+   - **第三方平台模式**：转发消息到第三方回调地址
+4. **保存消息记录**：将消息保存到数据库，用于会话管理
+
+#### 3. 第三方平台模式（消息转发）
+
+如果机器人配置了第三方平台回调地址，WorkBot服务器会转发消息：
+
+```http
+POST {第三方回调地址}
+Content-Type: application/json
+X-Signature: {signature}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "robotUuid": "550e8400-e29b-41d4-a716-446655440000",
+  "spoken": "你好啊",
+  "rawSpoken": "@机器人 你好啊",
+  "receivedName": "张三",
+  "groupName": "测试群1",
+  "groupRemark": "测试群1备注名",
+  "roomType": 1,
+  "atMe": true,
+  "textType": 1,
+  "fileBase64": "iVBORxxx==",
+  "timestamp": "2024-12-01T10:30:00Z"
+}
+```
+
+**注意事项**：
+- 第三方回调接口必须在 **3秒内** 响应
+- 如果处理耗时较长，应立即响应（200），处理完成后调用WorkBot发送接口
+- WorkBot会自动重试3次（1秒、3秒、5秒）
+
+**第三方平台响应**：
+```json
+{
+  "code": 0,
+  "message": "success"
+}
+```
+
+#### 4. 第三方平台发送回复
+
+第三方平台处理完消息后，调用WorkBot服务器发送回复：
+
+```http
+POST /api/robot/send-message
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "type": "text",
+  "titleList": ["张三", "测试群1"],
+  "content": "你好！我是AI助手，很高兴为您服务~",
+  "atList": ["张三"]
+}
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "指令已下发",
+  "data": {
+    "messageId": "msg_1703123456789_abc123",
+    "status": "pending"
+  }
+}
+```
+
+#### 5. WorkBot下发指令到APP
+
+WorkBot服务器将指令下发给APP：
+
+- **方式1：WebSocket推送**（推荐）
+  ```json
+  {
+    "type": "command",
+    "data": {
+      "messageId": "msg_1703123456789_abc123",
+      "command": "send_message",
+      "params": {
+        "type": "text",
+        "titleList": ["张三", "测试群1"],
+        "content": "你好！我是AI助手，很高兴为您服务~"
+      }
+    }
+  }
+  ```
+
+- **方式2：APP轮询**（备用）
+  APP定期调用 `/api/robot/commands` 获取待执行的指令
+
+#### 6. APP执行指令并发送消息
+
+APP收到指令后，通过企业微信API发送消息：
+
+1. 查找聊天窗口（根据titleList）
+2. 发送消息（文本/图片/文件等）
+3. @指定人员（如果atList不为空）
+4. 返回执行结果
+
+#### 7. WorkBot回调执行结果（可选）
+
+如果配置了结果回调，WorkBot会将执行结果回调给第三方平台：
+
+```http
+POST {第三方结果回调地址}
+Content-Type: application/json
+
+{
+  "robotId": "robot_1703123456789_abc123",
+  "messageId": "msg_1703123456789_abc123",
+  "errorCode": 0,
+  "errorReason": "",
+  "runTime": 1666238534935,
+  "timeCost": 2.5,
+  "type": 203,
+  "rawMsg": "{\"type\":203,\"titleList\":[\"张三\"],\"content\":\"你好~\"}",
+  "successList": ["张三"],
+  "failList": []
+}
+```
+
+**错误码说明**：
+
+| 错误码 | 说明 |
+|--------|------|
+| 0 | 执行成功 |
+| 101011 | 数据格式错误 |
+| 101012 | 非法操作 |
+| 101013 | 非法权限 |
+| 201011 | 创建群失败 |
+| 201012 | 群改名失败 |
+| 201013 | 群拉人失败 |
+| 201014 | 群踢人失败 |
+| 201101 | 查找聊天窗失败 |
+| 201102 | 发送消息失败 |
+
+### 支持的消息类型
+
+WorkBot支持以下消息类型供第三方平台调用：
+
+| type | 名称 | 说明 | 参数 |
+|------|------|------|------|
+| 203 | 文本消息 | 发送文本内容 | content, titleList, atList |
+| 218 | 文件消息 | 发送图片/视频/文件（网络URL） | fileUrl, fileType, objectName, titleList |
+| 208 | 微盘图片 | 发送微盘中的图片 | objectName, titleList |
+| 209 | 微盘文件 | 发送微盘中的文件 | objectName, titleList |
+| 205 | 转发消息 | 转发小程序消息 | titleList, receivedName, originalContent, nameList |
+| 206 | 创建群 | 创建外部群并拉人 | groupName, selectList, groupAnnouncement |
+| 207 | 修改群信息 | 修改群名、公告、成员等 | groupName, newGroupName, selectList, removeList |
+| 219 | 解散群 | 解散指定群（需群主权限） | groupName |
+| 213 | 添加好友 | 按手机号或群成员添加好友 | friend |
+| 220 | 群成员加好友 | 从外部群添加好友 | groupName, friend |
+| 225 | 修改群成员备注 | 修改群成员备注名 | groupName, friend |
+| 221 | 添加待办 | 给内部成员添加待办 | titleList, receivedContent |
+| 226 | 撤回消息 | 撤回机器人发送的消息 | titleList, originalContent, textType |
+| 234 | 删除联系人 | 删除指定联系人 | friend |
+
+### 安全机制
+
+#### 1. Token认证
+
+所有API请求都需要在Header中携带Token：
+
+```http
+Authorization: Bearer {access_token}
+```
+
+#### 2. 回调签名验证（可选）
+
+为了防止恶意请求，可以开启回调签名验证：
+
+**WorkBot服务器计算签名**：
+```typescript
+const signature = crypto
+  .createHmac('sha256', ROBOT_SECRET_KEY)
+  .update(JSON.stringify(payload))
+  .digest('hex');
+```
+
+**在请求头中携带**：
+```http
+X-Signature: {signature}
+```
+
+**第三方平台验证签名**：
+```typescript
+const expectedSignature = crypto
+  .createHmac('sha256', ROBOT_SECRET_KEY)
+  .update(JSON.stringify(requestBody))
+  .digest('hex');
+
+if (signature !== expectedSignature) {
+  // 拒绝请求
+}
+```
+
+### 频率限制
+
+- **API请求频率**：60 QPM（每分钟60次请求）
+- **回调接口超时**：3秒
+- **超出限制**：返回 429 错误
 
 ---
 
