@@ -5,6 +5,11 @@ export interface LoginParams {
   smsCode: string;
 }
 
+export interface LoginByPasswordParams {
+  phone: string;
+  password: string;
+}
+
 export interface RegisterParams {
   phone: string;
   password: string;
@@ -23,6 +28,19 @@ export class AuthService {
   async login(params: LoginParams) {
     const response = await apiClient.post<{ token: string; user: User }>(
       '/api/user/login-by-sms',
+      params
+    );
+    
+    if (response.data?.token) {
+      apiClient.setToken(response.data.token);
+    }
+    
+    return response;
+  }
+
+  async loginByPassword(params: LoginByPasswordParams) {
+    const response = await apiClient.post<{ token: string; user: User }>(
+      '/api/user/login-by-password',
       params
     );
     
