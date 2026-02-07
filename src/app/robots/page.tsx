@@ -82,30 +82,47 @@ export default function RobotsPage() {
     const loadRobots = async () => {
       try {
         const token = localStorage.getItem('token');
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-        };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
+        if (!token) {
+          console.error('未登录');
+          window.location.href = '/login';
+          return;
         }
 
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        };
+
+        console.log('开始加载机器人列表...');
         const response = await fetch('/api/robots', { headers });
         const data = await response.json();
 
-        if (data.success) {
+        console.log('机器人列表API响应:', data);
+
+        if (data.success && data.data) {
+          console.log('机器人数量:', data.data.length);
+
           // 转换API数据为页面需要的格式
-          const formattedRobots = data.data.map((robot: any) => ({
-            id: robot.id,
-            robotId: robot.bot_id || robot.robotId,
-            name: robot.name,
-            status: robot.status === 'online' ? 'online' : 'offline',
-            aiMode: robot.ai_mode || 'builtin',
-            aiProvider: robot.ai_provider || 'doubao',
-            totalMessages: robot.total_messages || 0,
-            lastActiveAt: robot.last_active_at || '-',
-            createdAt: robot.created_at,
-          }));
+          const formattedRobots = data.data.map((robot: any, index: number) => {
+            const formatted = {
+              id: robot.id,
+              robotId: robot.bot_id || robot.robotId,
+              name: robot.name,
+              status: robot.status === 'online' ? 'online' : 'offline',
+              aiMode: robot.ai_mode || 'builtin',
+              aiProvider: robot.ai_provider || 'doubao',
+              totalMessages: robot.total_messages || 0,
+              lastActiveAt: robot.last_active_at ? new Date(robot.last_active_at).toLocaleDateString('zh-CN') : '-',
+              createdAt: new Date(robot.created_at).toLocaleDateString('zh-CN'),
+            };
+            console.log(`机器人[${index}]:`, formatted);
+            return formatted;
+          });
+
+          console.log('设置机器人列表:', formattedRobots.length, '个');
           setRobots(formattedRobots);
+        } else {
+          console.error('API返回失败:', data);
         }
       } catch (error) {
         console.error('加载机器人列表失败:', error);
@@ -212,69 +229,82 @@ export default function RobotsPage() {
             <CardDescription>管理所有已创建的机器人</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>名称</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>AI 模型</TableHead>
-                    <TableHead>消息数</TableHead>
-                    <TableHead>最后活跃</TableHead>
-                    <TableHead>创建时间</TableHead>
-                    <TableHead>操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {robots.map((robot) => (
-                    <TableRow key={robot.id}>
-                      <TableCell className="font-medium">{robot.name}</TableCell>
-                      <TableCell>
-                        <Badge variant={robot.status === 'online' ? 'default' : 'secondary'}>
-                          {robot.status === 'online' ? (
-                            <span className="flex items-center gap-1">
-                              <Activity className="h-3 w-3" />
-                              在线
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <XCircle className="h-3 w-3" />
-                              离线
-                            </span>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="border-purple-500 text-purple-600">
-                          {robot.aiProvider}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{robot.totalMessages.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                          <Clock className="h-4 w-4" />
-                          {robot.lastActiveAt}
-                        </div>
-                      </TableCell>
-                      <TableCell>{robot.createdAt}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" className="text-blue-600">
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-green-600">
-                            <Power className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            {robots.length === 0 ? (
+              <div className="text-center py-12">
+                <Bot className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-300 mb-4">暂无机器人</p>
+                <Link href="/robots/create">
+                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                    <Plus className="mr-2 h-4 w-4" />
+                    绑定第一个机器人
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>名称</TableHead>
+                      <TableHead>机器人ID</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>消息数</TableHead>
+                      <TableHead>最后活跃</TableHead>
+                      <TableHead>创建时间</TableHead>
+                      <TableHead>操作</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {robots.map((robot) => (
+                      <TableRow key={robot.id}>
+                        <TableCell className="font-medium">{robot.name}</TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                            {robot.robotId}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={robot.status === 'online' ? 'default' : 'secondary'}>
+                            {robot.status === 'online' ? (
+                              <span className="flex items-center gap-1">
+                                <Activity className="h-3 w-3" />
+                                在线
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <XCircle className="h-3 w-3" />
+                                离线
+                              </span>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{robot.totalMessages.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                            <Clock className="h-4 w-4" />
+                            {robot.lastActiveAt}
+                          </div>
+                        </TableCell>
+                        <TableCell>{robot.createdAt}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" className="text-blue-600">
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-green-600">
+                              <Power className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-red-600">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
