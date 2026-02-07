@@ -13,7 +13,20 @@ import { randomBytes } from "crypto";
 const createRobotSchema = z.object({
   name: z.string().min(1).max(100).default("未命名机器人"),
   description: z.string().optional(),
+  autoGenerateCode: z.boolean().default(false),
+  validityPeriod: z.number().int().positive().optional(),
 });
+
+/**
+ * 生成8位随机激活码（大写字母+数字）
+ */
+function generateActivationCode(): string {
+  return Array.from({ length: 8 }, () =>
+    Math.random() < 0.5
+      ? String.fromCharCode(65 + Math.floor(Math.random() * 26)) // A-Z
+      : String.fromCharCode(48 + Math.floor(Math.random() * 10))  // 0-9
+  ).join('').toUpperCase();
+}
 
 /**
  * 生成botId：使用 bot_ 前缀
@@ -44,7 +57,7 @@ export async function GET(request: NextRequest) {
     const params: any[] = [];
     let paramIndex = 1;
 
-    // 如果不是管理员，只能查看自己的机器人
+    // 管理员可以查看所有机器人，非管理员只能查看自己的机器人
     if (!isAdmin(user)) {
       conditions.push(`r.created_by = $${paramIndex++}`);
       params.push(user.userId);
@@ -111,59 +124,123 @@ export async function POST(request: NextRequest) {
   try {
     const user = requireAuth(request);
 
+    // 只有管理员可以创建机器人
+    if (!isAdmin(user)) {
+      return NextResponse.json(
+        { success: false, error: "权限不足" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const validatedData = createRobotSchema.parse(body);
 
     console.log('创建机器人请求:', validatedData);
 
-    // 生成botId
-    const botId = generateBotId();
+    // 开始事务
+    await client.query('BEGIN');
 
-    const now = new Date();
+    try {
+      // 生成botId
+      const botId = generateBotId();
 
-    // 插入机器人（使用实际存在的字段）
-    const newRobotResult = await client.query(
-      `INSERT INTO robots (
-        bot_id, name, description, status, created_by, created_at, updated_at,
-        ai_mode, ai_provider, ai_model, ai_temperature, ai_max_tokens, ai_context_length, ai_scenario
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING *`,
-      [
-        botId,
-        validatedData.name,
-        validatedData.description || null,
-        'offline', // 初始状态为离线
-        user.userId,
-        now.toISOString(),
-        now.toISOString(),
-        'builtin', // 默认AI模式
-        'doubao', // 默认AI提供商
-        'doubao-pro-4k', // 默认AI模型
-        0.7, // 默认温度
-        2000, // 默认最大Token数
-        10, // 默认上下文长度
-        '咨询', // 默认场景
-      ]
-    );
+      const now = new Date();
 
-    const newRobot = newRobotResult.rows[0];
+      // 插入机器人（使用实际存在的字段）
+      const newRobotResult = await client.query(
+        `INSERT INTO robots (
+          bot_id, name, description, status, created_by, created_at, updated_at,
+          ai_mode, ai_provider, ai_model, ai_temperature, ai_max_tokens, ai_context_length, ai_scenario
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *`,
+        [
+          botId,
+          validatedData.name,
+          validatedData.description || null,
+          'offline', // 初始状态为离线
+          user.userId,
+          now.toISOString(),
+          now.toISOString(),
+          'builtin', // 默认AI模式
+          'doubao', // 默认AI提供商
+          'doubao-pro-4k', // 默认AI模型
+          0.7, // 默认温度
+          2000, // 默认最大Token数
+          10, // 默认上下文长度
+          '咨询', // 默认场景
+        ]
+      );
 
-    // 添加兼容字段
-    const robotWithCompatFields = {
-      ...newRobot,
-      robot_id: newRobot.bot_id,
-      robot_uuid: null,
-      user_id: newRobot.created_by,
-    };
+      const newRobot = newRobotResult.rows[0];
 
-    console.log('机器人创建成功:', robotWithCompatFields);
+      // 添加兼容字段
+      const robotWithCompatFields = {
+        ...newRobot,
+        robot_id: newRobot.bot_id,
+        robot_uuid: null,
+        user_id: newRobot.created_by,
+      };
 
-    return NextResponse.json({
-      success: true,
-      data: robotWithCompatFields,
-      message: "机器人创建成功",
-    });
+      console.log('机器人创建成功:', robotWithCompatFields);
+
+      let activationCodeData = null;
+
+      // 如果需要自动生成激活码
+      if (validatedData.autoGenerateCode) {
+        const code = generateActivationCode();
+        const validityPeriod = validatedData.validityPeriod || 365;
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + validityPeriod);
+
+        // 插入激活码
+        const activationCodeResult = await client.query(
+          `INSERT INTO activation_codes (
+            code, status, type, max_uses, used_count, remark,
+            created_by, expires_at, robot_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING *`,
+          [
+            code,
+            'unused',
+            'admin_dispatch',
+            1,
+            0,
+            '自动生成',
+            user.userId,
+            expiresAt.toISOString(),
+            botId,
+          ]
+        );
+
+        activationCodeData = {
+          ...activationCodeResult.rows[0],
+          robot_name: newRobot.name,
+          robot_id: botId,
+        };
+
+        console.log('激活码创建成功:', activationCodeData);
+      }
+
+      // 提交事务
+      await client.query('COMMIT');
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          robot: robotWithCompatFields,
+          activationCode: activationCodeData,
+        },
+        message: validatedData.autoGenerateCode 
+          ? "机器人和激活码创建成功" 
+          : "机器人创建成功",
+      });
+    } catch (error) {
+      // 回滚事务
+      await client.query('ROLLBACK');
+      throw error;
+    }
   } catch (error: any) {
     console.error("创建机器人错误:", error);
 
