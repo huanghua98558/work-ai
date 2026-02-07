@@ -12,16 +12,7 @@ import { randomBytes } from "crypto";
  */
 const createRobotSchema = z.object({
   name: z.string().min(1).max(100).default("未命名机器人"),
-  botType: z.string().optional(), // bot_type
   description: z.string().optional(),
-  // AI 配置
-  aiMode: z.enum(['builtin', 'third_party']).default('builtin'),
-  aiProvider: z.string().default('doubao'),
-  aiModel: z.string().default('doubao-pro-4k'),
-  aiTemperature: z.number().min(0).max(1).default(0.7),
-  aiMaxTokens: z.number().int().min(100).max(8000).default(2000),
-  aiContextLength: z.number().int().min(0).max(50).default(10),
-  aiScenario: z.string().default('咨询'),
 });
 
 /**
@@ -146,13 +137,13 @@ export async function POST(request: NextRequest) {
         user.userId,
         now.toISOString(),
         now.toISOString(),
-        validatedData.aiMode,
-        validatedData.aiProvider,
-        validatedData.aiModel,
-        validatedData.aiTemperature,
-        validatedData.aiMaxTokens,
-        validatedData.aiContextLength,
-        validatedData.aiScenario,
+        'builtin', // 默认AI模式
+        'doubao', // 默认AI提供商
+        'doubao-pro-4k', // 默认AI模型
+        0.7, // 默认温度
+        2000, // 默认最大Token数
+        10, // 默认上下文长度
+        '咨询', // 默认场景
       ]
     );
 
