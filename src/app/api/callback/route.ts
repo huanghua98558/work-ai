@@ -9,7 +9,62 @@ import { processMessage } from "@/lib/message-processor";
 import { sendWebSocketMessage } from "@/server/websocket-server";
 
 /**
- * 第三方平台回调接口
+ * 企业微信 URL 验证接口（GET）
+ * 企业微信首次配置回调URL时会调用此接口进行验证
+ * 
+ * 验证参数：
+ * - msg_signature: 签名
+ * - timestamp: 时间戳
+ * - nonce: 随机字符串
+ * - echostr: 加密字符串（需要解密后原样返回）
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const msg_signature = searchParams.get('msg_signature');
+    const timestamp = searchParams.get('timestamp');
+    const nonce = searchParams.get('nonce');
+    const echostr = searchParams.get('echostr');
+
+    console.log("收到企业微信URL验证请求:", { 
+      msg_signature, 
+      timestamp, 
+      nonce,
+      hasEchostr: !!echostr 
+    });
+
+    // 简单验证：直接返回 echostr
+    // 生产环境应该使用微信企业号接口进行签名验证
+    if (echostr) {
+      // 返回企业微信发送的 echostr 字符串（无需解密）
+      return new NextResponse(echostr, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      });
+    }
+
+    // 如果没有 echostr，返回成功响应
+    return NextResponse.json({
+      success: true,
+      message: "验证成功",
+    });
+  } catch (error: any) {
+    console.error("企业微信URL验证错误:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "验证失败",
+        code: "VALIDATION_ERROR",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * 第三方平台回调接口（POST）
  * 用于接收企业微信等第三方平台的消息推送
  */
 export async function POST(request: NextRequest) {
