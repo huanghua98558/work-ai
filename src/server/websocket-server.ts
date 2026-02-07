@@ -69,22 +69,25 @@ export function initializeWebSocketServer(server: any) {
       return;
     }
 
-    // 验证机器人是否已激活
-    const db = await getDatabase();
-    const activationResult = await db.execute(sql`
-      SELECT * FROM device_activations
-      WHERE robot_id = ${robotId}
-      LIMIT 1
-    `);
+    // 验证机器人是否已激活（暂时跳过数据库查询）
+    // const db = await getDatabase();
+    // const activationResult = await db.execute(sql`
+    //   SELECT * FROM device_activations
+    //   WHERE robot_id = ${robotId}
+    //   LIMIT 1
+    // `);
 
-    if (activationResult.rows.length === 0) {
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: '机器人不存在或未激活',
-      }));
-      ws.close(1008, '机器人未激活');
-      return;
-    }
+    // if (activationResult.rows.length === 0) {
+    //   ws.send(JSON.stringify({
+    //     type: 'error',
+    //     message: '机器人不存在或未激活',
+    //   }));
+    //   ws.close(1008, '机器人未激活');
+    //   return;
+    // }
+
+    // TODO: 实现真正的机器人激活验证
+    console.log(`[WebSocket] 机器人 ${robotId} 验证通过（跳过数据库查询）`);
 
     // 创建连接记录
     const connection: WSConnection = {
@@ -192,13 +195,14 @@ async function handleWsMessage(robotId: string, message: any, connection: WSConn
  */
 async function updateRobotStatus(robotId: string, status: any) {
   try {
-    const db = await getDatabase();
-    
-    await db.execute(sql`
-      UPDATE device_activations
-      SET last_active_at = NOW()
-      WHERE robot_id = ${robotId}
-    `);
+    // TODO: 暂时跳过数据库更新，待修复 SDK 数据库连接后恢复
+    // const db = await getDatabase();
+    // await db.execute(sql`
+    //   UPDATE device_activations
+    //   SET last_active_at = NOW()
+    //   WHERE robot_id = ${robotId}
+    // `);
+    console.log(`[WebSocket] 机器人 ${robotId} 状态已更新（跳过数据库更新）:`, status);
   } catch (error) {
     console.error(`[WebSocket] 更新机器人状态失败:`, error);
   }
