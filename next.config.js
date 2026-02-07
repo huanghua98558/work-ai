@@ -16,8 +16,13 @@ const nextConfig = {
   },
   // 优化输出
   output: 'standalone',
+  
+  // 配置服务器端外部包
+  serverExternalPackages: ['pg', 'postgres', 'drizzle-orm'],
+  
   // 配置允许的跨域开发域名
   allowedDevOrigins: ['49b5181c-5c6b-4cdb-bea3-88f08e909ea3.dev.coze.site'],
+  
   // 配置允许的跨域开发域名
   async headers() {
     return [

@@ -1,3 +1,6 @@
+// 强制动态渲染，避免构建时执行
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/jwt";
 

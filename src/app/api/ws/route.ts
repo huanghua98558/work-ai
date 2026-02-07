@@ -1,3 +1,6 @@
+// 强制动态渲染，避免构建时执行
+export const dynamic = 'force-dynamic';
+
 import { NextRequest } from "next/server";
 
 // Next.js 15+ 不直接支持在 API Routes 中处理 WebSocket
