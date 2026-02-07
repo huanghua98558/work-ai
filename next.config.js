@@ -15,8 +15,6 @@ const nextConfig = {
     unoptimized: true, // 禁用图片优化以避免额外依赖
   },
   // 优化输出
-  swcMinify: true,
-  // 减少构建输出
   output: 'standalone',
   // 配置允许的跨域开发域名
   allowedDevOrigins: ['49b5181c-5c6b-4cdb-bea3-88f08e909ea3.dev.coze.site'],
