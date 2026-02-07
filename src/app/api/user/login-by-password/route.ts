@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { userStore } from '@/lib/user-store';
+import { Pool } from 'pg';
+
+// 创建数据库连接池
+const connectionString = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
+const pool = new Pool({
+  connectionString: connectionString,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,44 +25,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 从用户存储查询并验证密码
-    const user = await userStore.verifyPassword(phone, password);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '账号或密码错误' },
-        { status: 401 }
+    // 从数据库查询用户
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT id, phone, password_hash, nickname, role, status, avatar FROM users WHERE phone = $1 AND status = $2',
+        [phone, 'active']
       );
-    }
 
-    // 更新最后登录时间
-    await userStore.updateLastLogin(user.id);
+      if (!result.rows || result.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: '账号或密码错误' },
+          { status: 401 }
+        );
+      }
 
-    // 生成 JWT Token
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        phone: user.phone,
-        role: user.role,
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '30d' }
-    );
+      const user = result.rows[0];
 
-    // 返回用户信息和 Token
-    return NextResponse.json({
-      success: true,
-      data: {
-        token,
-        user: {
-          id: user.id,
+      // 验证密码
+      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      if (!isPasswordValid) {
+        return NextResponse.json(
+          { success: false, error: '账号或密码错误' },
+          { status: 401 }
+        );
+      }
+
+      // 更新最后登录时间
+      await client.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
+
+      // 生成 JWT Token
+      const token = jwt.sign(
+        {
+          userId: user.id,
           phone: user.phone,
-          nickname: user.nickname,
           role: user.role,
-          avatar: user.avatar,
         },
-      },
-    });
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '30d' }
+      );
+
+      // 返回用户信息和 Token
+      return NextResponse.json({
+        success: true,
+        data: {
+          token,
+          user: {
+            id: user.id,
+            phone: user.phone,
+            nickname: user.nickname,
+            role: user.role,
+            avatar: user.avatar,
+          },
+        },
+      });
+    } finally {
+      client.release();
+    }
   } catch (error: any) {
     console.error('登录失败:', error);
     return NextResponse.json(
