@@ -17,11 +17,6 @@ export default function Home() {
                 立即开始
               </Button>
             </a>
-            <a href="/docs">
-              <Button size="lg" variant="outline">
-                查看文档
-              </Button>
-            </a>
           </div>
         </div>
 
