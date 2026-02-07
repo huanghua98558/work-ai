@@ -3,6 +3,8 @@ import { getDatabase } from "@/lib/db";
 import { sql } from "drizzle-orm";
 import { MessageType, MessageDirection, MessageStatus, MessageReportRequest } from "@/types/message";
 import { validateMessageType, generateMessageId, generateSessionId } from "@/lib/message-utils";
+import { getMessageHandler } from "@/lib/message-handler";
+import { extractHeadersFromRequest } from "@/lib/ai-service";
 import { z } from "zod";
 
 const messageReportSchema = z.object({
@@ -139,13 +141,33 @@ export async function POST(request: NextRequest) {
 
     const message = messageResult.rows[0];
 
+    // 6. 保存用户消息到会话上下文
+    try {
+      await db.execute(sql`
+        INSERT INTO session_contexts (session_id, message_id, role, content)
+        VALUES (${sessionId}, ${message.id}, 'user', ${content})
+      `);
+    } catch (error) {
+      console.error("保存用户消息到上下文失败:", error);
+    }
+
+    // 7. 自动回复（后台处理）
+    // 只有文本消息才触发自动回复
+    if (messageType === MessageType.TEXT || messageType === MessageType.IMAGE) {
+      // 异步处理，不阻塞响应
+      processAutoReply(robotId, content, messageType, sessionId, userId, request.headers).catch(error => {
+        console.error("自动回复处理失败:", error);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         messageId: message.id,
         sessionId,
         status: 'received',
-        message: "消息上报成功",
+        autoReply: 'processing',
+        message: "消息上报成功，正在处理自动回复",
       },
     });
   } catch (error: any) {
@@ -171,5 +193,77 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * 处理自动回复
+ */
+async function processAutoReply(
+  robotId: string,
+  content: string,
+  messageType: MessageType,
+  sessionId: string,
+  userId: string | undefined,
+  headers: Headers
+): Promise<void> {
+  try {
+    const handler = getMessageHandler();
+    const customHeaders = extractHeadersFromRequest(headers);
+
+    const result = await handler.handleMessage(
+      robotId,
+      content,
+      messageType,
+      sessionId,
+      userId,
+      customHeaders
+    );
+
+    if (result.success && result.response) {
+      // 通过 WebSocket 发送回复
+      const { sendWebSocketMessage } = await import('@/server/websocket-server');
+      
+      sendWebSocketMessage(robotId, {
+        type: 'auto_reply',
+        data: {
+          robotId,
+          sessionId,
+          userId,
+          response: result.response,
+          usedKnowledgeBase: result.usedKnowledgeBase,
+          timestamp: Date.now(),
+        },
+      });
+
+      // 保存回复到消息表
+      const db = await getDatabase();
+      await db.execute(sql`
+        INSERT INTO messages (
+          robot_id,
+          user_id,
+          session_id,
+          message_type,
+          content,
+          extra_data,
+          status,
+          direction,
+          created_at
+        )
+        VALUES (
+          ${robotId},
+          ${userId || null},
+          ${sessionId},
+          'text',
+          ${result.response},
+          ${JSON.stringify({ autoReply: true, usedKnowledgeBase: result.usedKnowledgeBase })},
+          'sent',
+          'outgoing',
+          NOW()
+        )
+      `);
+    }
+  } catch (error) {
+    console.error("自动回复处理失败:", error);
   }
 }
