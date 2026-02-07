@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { generateAccessToken, generateRefreshToken, JWTPayload } from "@/lib/jwt";
 import { z } from "zod";
+import bcrypt from 'bcryptjs';
 
 const loginSchema = z.object({
   phone: z.string().min(1).max(20),
@@ -50,12 +51,21 @@ export async function POST(request: NextRequest) {
     // 验证密码
     let isPasswordValid = false;
 
-    // 方式1：使用password_hash字段验证（新方式）
+    // 方式1：使用bcrypt验证password_hash字段（推荐方式）
     if (user.password_hash) {
+      try {
+        isPasswordValid = await bcrypt.compare(validatedData.password, user.password_hash);
+      } catch (error) {
+        console.error('bcrypt验证失败:', error);
+      }
+    }
+
+    // 方式2：直接比较password_hash（向后兼容旧数据）
+    if (!isPasswordValid && user.password_hash) {
       isPasswordValid = validatedData.password === user.password_hash;
     }
 
-    // 方式2：使用手机号作为密码（临时兼容，用于测试）
+    // 方式3：使用手机号作为密码（临时兼容，用于测试）
     if (!isPasswordValid) {
       isPasswordValid = validatedData.password === user.phone;
     }

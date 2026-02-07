@@ -26,6 +26,10 @@ export const activationCodes = pgTable('activation_codes', {
   expiresAt: timestamp('expires_at'), // 激活码过期时间
   usedAt: timestamp('used_at'), // 首次使用时间
   notes: text('notes'),
+  robotId: varchar('robot_id'), // 绑定的机器人ID
+  type: varchar('type', { length: 50 }).default('admin_dispatch'), // admin_dispatch, pure_code
+  maxUses: integer('max_uses').default(1), // 最大使用次数
+  usedCount: integer('used_count').default(0), // 已使用次数
 })
 
 // 机器人配置表

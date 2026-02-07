@@ -146,13 +146,12 @@ export async function POST(request: NextRequest) {
 
       const now = new Date();
 
-      // 插入机器人（使用实际存在的字段）
+      // 插入机器人（只插入基本必需字段）
       const newRobotResult = await client.query(
         `INSERT INTO robots (
-          bot_id, name, description, status, created_by, created_at, updated_at,
-          ai_mode, ai_provider, ai_model, ai_temperature, ai_max_tokens, ai_context_length, ai_scenario
+          bot_id, name, description, status, created_by, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
         [
           botId,
@@ -162,13 +161,6 @@ export async function POST(request: NextRequest) {
           user.userId,
           now.toISOString(),
           now.toISOString(),
-          'builtin', // 默认AI模式
-          'doubao', // 默认AI提供商
-          'doubao-pro-4k', // 默认AI模型
-          0.7, // 默认温度
-          2000, // 默认最大Token数
-          10, // 默认上下文长度
-          '咨询', // 默认场景
         ]
       );
 

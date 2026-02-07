@@ -151,42 +151,87 @@ export default function CreateRobotPage() {
             <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
               <CardTitle className="flex items-center gap-2">
                 <Key className="h-5 w-5 text-green-600" />
-                激活码
+                机器人信息
               </CardTitle>
-              <CardDescription>复制此激活码，用于激活机器人</CardDescription>
+              <CardDescription>复制机器人和激活码，用于激活和绑定</CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              <div className="flex items-center gap-4">
-                <code className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-lg font-mono text-lg text-center">
-                  {activationCode}
-                </code>
-                <Button
-                  onClick={copyActivationCode}
-                  className="shrink-0"
-                >
-                  {copied ? (
-                    <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      已复制
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="mr-2 h-4 w-4" />
-                      复制
-                    </>
-                  )}
-                </Button>
-              </div>
-              
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium mb-2">
-                  机器人信息：
-                </p>
-                <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                  <p>• 名称：{createdRobot.name}</p>
-                  <p>• ID：{createdRobot.bot_id}</p>
-                  <p>• 状态：{createdRobot.status === 'online' ? '在线' : '离线'}</p>
+              {/* 机器人ID */}
+              <div className="space-y-2">
+                <Label htmlFor="robotId">机器人ID</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="robotId"
+                    value={createdRobot.bot_id}
+                    readOnly
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdRobot.bot_id);
+                      toast({
+                        title: '复制成功',
+                        description: '机器人ID已复制到剪贴板',
+                        variant: 'success',
+                      });
+                    }}
+                    size="icon"
+                    variant="outline"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                 </div>
+                <p className="text-xs text-gray-500">
+                  用于在后台添加机器人
+                </p>
+              </div>
+
+              {/* 激活码 */}
+              <div className="space-y-2">
+                <Label htmlFor="activationCode">激活码</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="activationCode"
+                    value={activationCode}
+                    readOnly
+                    className="font-mono text-lg text-center"
+                  />
+                  <Button
+                    onClick={copyActivationCode}
+                    size="icon"
+                    variant="outline"
+                  >
+                    {copied ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  用于在APP上激活机器人，激活后获取通讯码
+                </p>
+              </div>
+
+              {/* 提示信息 */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  📱 用户激活流程：
+                </p>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                  <li>用户在APP上输入激活码</li>
+                  <li>APP向服务器验证激活码</li>
+                  <li>验证成功后返回机器人ID和通讯码</li>
+                  <li>APP保存机器人和通讯码，开始使用</li>
+                </ol>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 pt-2">
+                  💻 后台绑定流程：
+                </p>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                  <li>在添加机器人时输入机器人ID或激活码</li>
+                  <li>系统自动绑定机器人到用户</li>
+                  <li>用户可以管理绑定的机器人</li>
+                </ol>
               </div>
 
               <Button
