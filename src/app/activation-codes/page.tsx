@@ -79,8 +79,7 @@ export default function ActivationCodesPage() {
   
   // 生成激活码弹窗
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [bindMode, setBindMode] = useState<'existing' | 'new'>('new');
-  const [selectedRobotId, setSelectedRobotId] = useState('');
+  const [selectedRobotId, setSelectedRobotId] = useState(''); // 绑定的机器人ID（可选）
   const [robotName, setRobotName] = useState('');
   const [validityPeriod, setValidityPeriod] = useState('365');
   const [notes, setNotes] = useState('');
@@ -189,19 +188,8 @@ export default function ActivationCodesPage() {
     try {
       setIsCreating(true);
 
-      // 验证：如果选择了绑定机器人模式，必须选择机器人
-      if (bindMode === 'existing' && !selectedRobotId) {
-        toast({
-          title: '验证失败',
-          description: '请选择要绑定的机器人',
-          variant: 'destructive',
-        });
-        setIsCreating(false);
-        return;
-      }
-
       // 验证：批量生成时不能绑定机器人
-      if (bindMode === 'existing' && parseInt(batchCount) > 1) {
+      if (selectedRobotId && parseInt(batchCount) > 1) {
         toast({
           title: '验证失败',
           description: '绑定机器人模式只能生成1个激活码',
@@ -214,11 +202,10 @@ export default function ActivationCodesPage() {
       const requestBody: any = {
         validityPeriod: parseInt(validityPeriod),
         notes,
-        type: bindMode === 'existing' ? 'admin_dispatch' : 'pure_code',
         batchCount: parseInt(batchCount), // 批量生成数量
       };
 
-      if (bindMode === 'existing' && selectedRobotId) {
+      if (selectedRobotId) {
         requestBody.robotId = selectedRobotId;
       }
 
@@ -770,58 +757,30 @@ export default function ActivationCodesPage() {
           <DialogHeader>
             <DialogTitle>生成新激活码</DialogTitle>
             <DialogDescription>
-              {bindMode === 'existing' 
-                ? '绑定已有机器人（激活码列表会显示机器人ID）' 
-                : '纯激活码（激活时自动创建机器人，激活码列表机器人ID为空）'}
+              {selectedRobotId
+                ? '激活时将使用绑定的机器人'
+                : '激活时自动创建新机器人'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>激活码类型</Label>
-              <Select value={bindMode} onValueChange={(v: 'existing' | 'new') => setBindMode(v)}>
+              <Label>绑定机器人（可选）</Label>
+              <Select value={selectedRobotId} onValueChange={setSelectedRobotId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="选择激活码类型" />
+                  <SelectValue placeholder="不选择则激活时自动创建机器人" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      <div>
-                        <div className="font-medium">纯激活码（默认）</div>
-                        <div className="text-xs text-gray-500">激活时自动创建机器人，列表中机器人ID为空</div>
-                      </div>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="existing">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      <div>
-                        <div className="font-medium">绑定机器人</div>
-                        <div className="text-xs text-gray-500">绑定已存在的机器人，列表中会显示机器人ID</div>
-                      </div>
-                    </div>
-                  </SelectItem>
+                  {robots.filter(r => r.status !== 'deleted').map(robot => (
+                    <SelectItem key={robot.robot_id} value={robot.robot_id}>
+                      {robot.name} ({robot.robot_id})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-500">
+                💡 不选择机器人时，激活时会自动创建新机器人
+              </p>
             </div>
-
-            {bindMode === 'existing' && (
-              <div className="space-y-2">
-                <Label>选择机器人</Label>
-                <Select value={selectedRobotId} onValueChange={setSelectedRobotId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择机器人" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {robots.filter(r => r.status !== 'deleted').map(robot => (
-                      <SelectItem key={robot.robot_id} value={robot.robot_id}>
-                        {robot.name} ({robot.robot_id})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label>有效期</Label>
@@ -839,7 +798,7 @@ export default function ActivationCodesPage() {
 
             <div className="space-y-2">
               <Label>生成数量</Label>
-              <Select value={batchCount} onValueChange={setBatchCount}>
+              <Select value={batchCount} onValueChange={setBatchCount} disabled={!!selectedRobotId}>
                 <SelectTrigger>
                   <SelectValue placeholder="选择生成数量" />
                 </SelectTrigger>
@@ -852,9 +811,9 @@ export default function ActivationCodesPage() {
                   <SelectItem value="100">100 个</SelectItem>
                 </SelectContent>
               </Select>
-              {bindMode === 'existing' && (
+              {selectedRobotId && (
                 <p className="text-xs text-gray-500 mt-1">
-                  ⚠️ 绑定机器人模式只能生成 1 个激活码
+                  ⚠️ 绑定机器人后只能生成 1 个激活码
                 </p>
               )}
             </div>
