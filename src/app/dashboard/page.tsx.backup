@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '@/components/layout/main-layout'
 import { Button } from '@/components/ui/button'
@@ -24,51 +24,6 @@ import {
   Globe,
 } from 'lucide-react'
 
-// 缓存键常量
-const CACHE_KEYS = {
-  STATS: 'dashboard_stats',
-  CONVERSATIONS: 'dashboard_conversations',
-  ROBOTS: 'dashboard_robots',
-}
-
-// 缓存有效期（5分钟）
-const CACHE_TTL = 5 * 60 * 1000
-
-// 获取缓存数据
-const getCachedData = <T,>(key: string): T | null => {
-  try {
-    const cached = localStorage.getItem(key)
-    if (!cached) return null
-
-    const { data, timestamp } = JSON.parse(cached)
-    const now = Date.now()
-
-    // 检查缓存是否过期
-    if (now - timestamp > CACHE_TTL) {
-      localStorage.removeItem(key)
-      return null
-    }
-
-    return data
-  } catch (error) {
-    console.error('Error reading cache:', error)
-    return null
-  }
-}
-
-// 设置缓存数据
-const setCachedData = <T,>(key: string, data: T): void => {
-  try {
-    const cacheItem = {
-      data,
-      timestamp: Date.now(),
-    }
-    localStorage.setItem(key, JSON.stringify(cacheItem))
-  } catch (error) {
-    console.error('Error setting cache:', error)
-  }
-}
-
 export default function DashboardPage() {
   const router = useRouter()
   const [stats, setStats] = useState({
@@ -82,88 +37,6 @@ export default function DashboardPage() {
   const [recentConversations, setRecentConversations] = useState<any[]>([])
   const [recentRobots, setRecentRobots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
-
-  // 模拟API数据获取（实际应该调用后端API）
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setLoading(true)
-
-      // 尝试从缓存读取数据
-      const cachedStats = getCachedData(CACHE_KEYS.STATS)
-      const cachedConversations = getCachedData(CACHE_KEYS.CONVERSATIONS)
-      const cachedRobots = getCachedData(CACHE_KEYS.ROBOTS)
-
-      if (cachedStats && cachedConversations && cachedRobots) {
-        // 使用缓存数据快速渲染
-        setStats(cachedStats)
-        setRecentConversations(cachedConversations)
-        setRecentRobots(cachedRobots)
-        setLastUpdated(Date.now() - cachedStats.timestamp)
-        setLoading(false)
-
-        // 后台更新数据
-        refreshData()
-      } else {
-        // 没有缓存，直接获取新数据
-        await refreshData()
-      }
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error)
-      setLoading(false)
-    }
-  }, [])
-
-  // 刷新数据（获取最新数据）
-  const refreshData = useCallback(async () => {
-    try {
-      setLoading(true)
-
-      // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // 这里应该调用真实的API
-      // const response = await fetch('/api/dashboard/stats')
-      // const data = await response.json()
-
-      // 模拟数据
-      const newStats = {
-        totalRobots: 5,
-        totalActivationCodes: 120,
-        totalConversations: 85,
-        totalMessages: 1234,
-        activeRobots: 4,
-        todayMessages: 67,
-      }
-
-      const newConversations = [
-        { id: 1, robotName: '客服机器人1', user: '用户001', lastMessage: '请问如何激活？', time: '2 分钟前', status: 'active' },
-        { id: 2, robotName: '企业助手', user: '员工002', lastMessage: '查询销售数据', time: '15 分钟前', status: 'active' },
-        { id: 3, robotName: '智能问答', user: '用户003', lastMessage: '产品价格是多少？', time: '1 小时前', status: 'closed' },
-      ]
-
-      const newRobots = [
-        { id: 1, name: '客服机器人1', status: 'online', messages: 456, lastActive: '2 分钟前' },
-        { id: 2, name: '企业助手', status: 'online', messages: 321, lastActive: '5 分钟前' },
-        { id: 3, name: '智能问答', status: 'offline', messages: 189, lastActive: '1 小时前' },
-      ]
-
-      // 更新状态
-      setStats(newStats)
-      setRecentConversations(newConversations)
-      setRecentRobots(newRobots)
-      setLastUpdated(Date.now())
-
-      // 更新缓存
-      setCachedData(CACHE_KEYS.STATS, newStats)
-      setCachedData(CACHE_KEYS.CONVERSATIONS, newConversations)
-      setCachedData(CACHE_KEYS.ROBOTS, newRobots)
-    } catch (error) {
-      console.error('Failed to refresh data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   useEffect(() => {
     // 检查是否已登录
@@ -175,19 +48,39 @@ export default function DashboardPage() {
 
     // 加载统计数据
     fetchDashboardData()
-  }, [router, fetchDashboardData])
+  }, [router])
 
-  // 使用 useMemo 优化计算
-  const onlineRobotsCount = useMemo(() => {
-    return recentRobots.filter(r => r.status === 'online').length
-  }, [recentRobots])
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      // 这里可以调用 API 获取真实数据
+      // 目前使用模拟数据
+      setStats({
+        totalRobots: 5,
+        totalActivationCodes: 120,
+        totalConversations: 85,
+        totalMessages: 1234,
+        activeRobots: 4,
+        todayMessages: 67,
+      })
+      setRecentConversations([
+        { id: 1, robotName: '客服机器人1', user: '用户001', lastMessage: '请问如何激活？', time: '2 分钟前', status: 'active' },
+        { id: 2, robotName: '企业助手', user: '员工002', lastMessage: '查询销售数据', time: '15 分钟前', status: 'active' },
+        { id: 3, robotName: '智能问答', user: '用户003', lastMessage: '产品价格是多少？', time: '1 小时前', status: 'closed' },
+      ])
+      setRecentRobots([
+        { id: 1, name: '客服机器人1', status: 'online', messages: 456, lastActive: '2 分钟前' },
+        { id: 2, name: '企业助手', status: 'online', messages: 321, lastActive: '5 分钟前' },
+        { id: 3, name: '智能问答', status: 'offline', messages: 189, lastActive: '1 小时前' },
+      ])
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const activeConversationsCount = useMemo(() => {
-    return recentConversations.filter(c => c.status === 'active').length
-  }, [recentConversations])
-
-  if (loading && (!lastUpdated || lastUpdated > CACHE_TTL)) {
-    // 首次加载或缓存过期时显示加载状态
+  if (loading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -234,107 +127,183 @@ export default function DashboardPage() {
 
         {/* 统计卡片 - 使用渐变背景 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <StatCard
-            title="机器人总数"
-            value={stats.totalRobots}
-            description={`${stats.activeRobots} 个在线`}
-            icon={Bot}
-            gradient="from-blue-500 to-blue-600"
-          />
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-blue-50">机器人总数</CardTitle>
+              <Bot className="h-4 w-4 text-blue-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.totalRobots}</div>
+              <p className="text-sm text-blue-100 mt-1">
+                {stats.activeRobots} 个在线
+              </p>
+            </CardContent>
+          </Card>
 
-          <StatCard
-            title="激活码数量"
-            value={stats.totalActivationCodes}
-            description="85 未使用 · 35 已使用"
-            icon={Key}
-            gradient="from-green-500 to-green-600"
-          />
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-green-50">激活码数量</CardTitle>
+              <Key className="h-4 w-4 text-green-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.totalActivationCodes}</div>
+              <p className="text-sm text-green-100 mt-1">
+                85 未使用 · 35 已使用
+              </p>
+            </CardContent>
+          </Card>
 
-          <StatCard
-            title="对话总数"
-            value={stats.totalConversations}
-            description="历史对话记录"
-            icon={MessageSquare}
-            gradient="from-purple-500 to-purple-600"
-          />
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-purple-50">对话总数</CardTitle>
+              <MessageSquare className="h-4 w-4 text-purple-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.totalConversations}</div>
+              <p className="text-sm text-purple-100 mt-1">
+                历史对话记录
+              </p>
+            </CardContent>
+          </Card>
 
-          <StatCard
-            title="消息总数"
-            value={stats.totalMessages}
-            description={`今日新增 ${stats.todayMessages} 条`}
-            icon={Activity}
-            gradient="from-orange-500 to-orange-600"
-          />
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-50">消息总数</CardTitle>
+              <Activity className="h-4 w-4 text-orange-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.totalMessages}</div>
+              <p className="text-sm text-orange-100 mt-1">
+                今日新增 {stats.todayMessages} 条
+              </p>
+            </CardContent>
+          </Card>
 
-          <StatCard
-            title="活跃用户"
-            value="28"
-            description="最近 7 天活跃"
-            icon={Users}
-            gradient="from-pink-500 to-pink-600"
-          />
+          <Card className="bg-gradient-to-br from-pink-500 to-pink-600 text-white border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-pink-50">活跃用户</CardTitle>
+              <Users className="h-4 w-4 text-pink-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">28</div>
+              <p className="text-sm text-pink-100 mt-1">
+                最近 7 天活跃
+              </p>
+            </CardContent>
+          </Card>
 
-          <StatCard
-            title="响应速度"
-            value="1.2s"
-            description="平均响应时间"
-            icon={Clock}
-            gradient="from-cyan-500 to-cyan-600"
-          />
+          <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white border-0">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-cyan-50">响应速度</CardTitle>
+              <Clock className="h-4 w-4 text-cyan-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">1.2s</div>
+              <p className="text-sm text-cyan-100 mt-1">
+                平均响应时间
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* 快速操作 - 使用鲜艳的渐变色大卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <QuickActionCard
-            href="/robots"
-            title="管理机器人"
-            description="配置和管理您的机器人"
-            icon={Bot}
-            gradient="from-blue-500 to-indigo-600"
-          />
+          <Link href="/robots" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Bot className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">管理机器人</h3>
+                <p className="text-sm text-blue-100">配置和管理您的机器人</p>
+              </div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            </div>
+          </Link>
 
-          <QuickActionCard
-            href="/activation-codes"
-            title="生成激活码"
-            description="创建和管理激活码"
-            icon={Key}
-            gradient="from-green-500 to-emerald-600"
-          />
+          <Link href="/activation-codes" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Key className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">生成激活码</h3>
+                <p className="text-sm text-green-100">创建和管理激活码</p>
+              </div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            </div>
+          </Link>
 
-          <QuickActionCard
-            href="/knowledge"
-            title="知识库管理"
-            description="上传和管理文档"
-            icon={Activity}
-            gradient="from-purple-500 to-pink-600"
-          />
+          <Link href="/knowledge" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Activity className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">知识库管理</h3>
+                <p className="text-sm text-purple-100">上传和管理文档</p>
+              </div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            </div>
+          </Link>
 
-          <QuickActionCard
-            href="/messages"
-            title="查看消息"
-            description="查看对话记录"
-            icon={MessageSquare}
-            gradient="from-orange-500 to-red-600"
-          />
+          <Link href="/messages" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer">
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <MessageSquare className="h-7 w-7" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">查看消息</h3>
+                <p className="text-sm text-orange-100">查看对话记录</p>
+              </div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            </div>
+          </Link>
         </div>
 
         {/* 快速操作第二行 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <WideQuickActionCard
-            href="/users"
-            title="用户管理"
-            description="管理系统用户和权限"
-            icon={Users}
-            gradient="from-rose-500 via-pink-600 to-red-600"
-          />
+          <Link href="/users" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-500 via-pink-600 to-red-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                      <Users className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">用户管理</h3>
+                      <p className="text-sm text-rose-100">管理系统用户和权限</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-20 h-20 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              </div>
+            </div>
+          </Link>
 
-          <WideQuickActionCard
-            href="/settings"
-            title="系统设置"
-            description="配置系统参数和选项"
-            icon={Settings}
-            gradient="from-cyan-500 via-teal-600 to-green-600"
-          />
+          <Link href="/settings" className="group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-600 to-green-600 p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                      <Settings className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">系统设置</h3>
+                      <p className="text-sm text-cyan-100">配置系统参数和选项</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-20 h-20 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              </div>
+            </div>
+          </Link>
         </div>
 
         {/* 最近对话、活跃机器人和最近激活码 */}
@@ -507,7 +476,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* 平台支持卡片 */}
+        {/* 平台支持卡片 - 新增 */}
         <Card className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white border-0">
           <CardContent className="p-8">
             <div className="flex items-center justify-between">
@@ -540,84 +509,5 @@ export default function DashboardPage() {
         </Card>
       </div>
     </MainLayout>
-  )
-}
-
-// 提取的组件 - 统计卡片
-function StatCard({ title, value, description, icon: Icon, gradient }: {
-  title: string
-  value: string | number
-  description: string
-  icon: any
-  gradient: string
-}) {
-  return (
-    <Card className={`bg-gradient-to-br ${gradient} text-white border-0`}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className={`text-sm font-medium text-white/80`}>{title}</CardTitle>
-        <Icon className="h-4 w-4 text-white/70" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        <p className="text-sm text-white/80 mt-1">
-          {description}
-        </p>
-      </CardContent>
-    </Card>
-  )
-}
-
-// 提取的组件 - 快速操作卡片
-function QuickActionCard({ href, title, description, icon: Icon, gradient }: {
-  href: string
-  title: string
-  description: string
-  icon: any
-  gradient: string
-}) {
-  return (
-    <Link href={href} className="group">
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer`}>
-        <div className="relative z-10">
-          <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-            <Icon className="h-7 w-7" />
-          </div>
-          <h3 className="text-xl font-bold mb-1">{title}</h3>
-          <p className="text-sm text-white/80">{description}</p>
-        </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
-      </div>
-    </Link>
-  )
-}
-
-// 提取的组件 - 宽版快速操作卡片
-function WideQuickActionCard({ href, title, description, icon: Icon, gradient }: {
-  href: string
-  title: string
-  description: string
-  icon: any
-  gradient: string
-}) {
-  return (
-    <Link href={href} className="group">
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${gradient} p-6 text-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer`}>
-        <div className="flex items-center justify-between">
-          <div className="relative z-10">
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                <Icon className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold">{title}</h3>
-                <p className="text-sm text-white/80">{description}</p>
-              </div>
-            </div>
-          </div>
-          <div className="w-20 h-20 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-        </div>
-      </div>
-    </Link>
   )
 }

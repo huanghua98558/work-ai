@@ -58,6 +58,62 @@ app.prepare().then(() => {
     process.exit(1);
   });
 
+  // 定义优雅关闭函数（放在server作用域内）
+  let isShuttingDown = false;
+  function gracefulShutdown(exitCode: number, reason: string) {
+    if (isShuttingDown) {
+      console.log('[Server] Shutdown already in progress, ignoring...');
+      return;
+    }
+    
+    isShuttingDown = true;
+    console.log(`[Server] Starting graceful shutdown (reason: ${reason})...`);
+
+    // 设置强制关闭超时（10秒）
+    const forceShutdownTimeout = setTimeout(() => {
+      console.log('[Server] Force shutdown timeout reached, exiting...');
+      process.exit(1);
+    }, 10000);
+
+    // 关闭HTTP服务器
+    console.log('[Server] Closing HTTP server...');
+    server.close((err) => {
+      if (err) {
+        console.error('[Server] Error closing server:', err);
+        clearTimeout(forceShutdownTimeout);
+        process.exit(1);
+      }
+      
+      console.log('[Server] HTTP server closed');
+      
+      // 清理其他资源
+      console.log('[Server] Cleaning up resources...');
+      
+      // 清理WebSocket连接
+      try {
+        // 这里可以添加WebSocket连接清理逻辑
+        console.log('[Server] WebSocket connections cleaned');
+      } catch (err) {
+        console.error('[Server] Error cleaning WebSocket:', err);
+      }
+
+      // 清理数据库连接（如果有）
+      try {
+        // 这里可以添加数据库连接清理逻辑
+        console.log('[Server] Database connections cleaned');
+      } catch (err) {
+        console.error('[Server] Error cleaning database:', err);
+      }
+
+      console.log('[Server] Graceful shutdown completed');
+      clearTimeout(forceShutdownTimeout);
+      process.exit(exitCode);
+    });
+
+    // 立即停止接受新连接
+    console.log('[Server] Stopping accepting new connections...');
+  }
+
   // 添加进程退出处理
   process.on('uncaughtException', (err) => {
     console.error('[Server] Uncaught Exception:', err);
@@ -86,66 +142,6 @@ app.prepare().then(() => {
   console.error('[Server] Failed to start server:', err);
   process.exit(1);
 });
-
-/**
- * 优雅关闭函数
- * @param exitCode 退出码
- * @param reason 关闭原因
- */
-let isShuttingDown = false;
-function gracefulShutdown(exitCode: number, reason: string) {
-  if (isShuttingDown) {
-    console.log('[Server] Shutdown already in progress, ignoring...');
-    return;
-  }
-  
-  isShuttingDown = true;
-  console.log(`[Server] Starting graceful shutdown (reason: ${reason})...`);
-
-  // 设置强制关闭超时（10秒）
-  const forceShutdownTimeout = setTimeout(() => {
-    console.log('[Server] Force shutdown timeout reached, exiting...');
-    process.exit(1);
-  }, 10000);
-
-  // 关闭HTTP服务器
-  console.log('[Server] Closing HTTP server...');
-  server.close((err) => {
-    if (err) {
-      console.error('[Server] Error closing server:', err);
-      clearTimeout(forceShutdownTimeout);
-      process.exit(1);
-    }
-    
-    console.log('[Server] HTTP server closed');
-    
-    // 清理其他资源
-    console.log('[Server] Cleaning up resources...');
-    
-    // 清理WebSocket连接
-    try {
-      // 这里可以添加WebSocket连接清理逻辑
-      console.log('[Server] WebSocket connections cleaned');
-    } catch (err) {
-      console.error('[Server] Error cleaning WebSocket:', err);
-    }
-
-    // 清理数据库连接（如果有）
-    try {
-      // 这里可以添加数据库连接清理逻辑
-      console.log('[Server] Database connections cleaned');
-    } catch (err) {
-      console.error('[Server] Error cleaning database:', err);
-    }
-
-    console.log('[Server] Graceful shutdown completed');
-    clearTimeout(forceShutdownTimeout);
-    process.exit(exitCode);
-  });
-
-  // 立即停止接受新连接
-  console.log('[Server] Stopping accepting new connections...');
-}
 
 /**
  * 启动监控功能
