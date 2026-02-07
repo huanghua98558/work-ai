@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
             avatar: user.avatar,
           },
         },
+        timestamp: new Date().toISOString(),
       });
     } finally {
       client.release();

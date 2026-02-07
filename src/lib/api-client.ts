@@ -80,7 +80,11 @@ class ApiClient {
 
       return data;
     } catch (error: any) {
-      console.error('API Request Error:', error);
+      console.error('API Request Error:', {
+        endpoint,
+        url: `${API_BASE_URL}${endpoint}`,
+        error: error.message,
+      });
       throw error;
     }
   }
