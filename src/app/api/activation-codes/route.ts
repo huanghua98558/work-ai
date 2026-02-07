@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuth, isAdmin } from "@/lib/auth";
 import { z } from "zod";
-import { randomBytes } from "crypto";
 
 /**
  * 创建激活码验证 Schema
@@ -24,6 +23,8 @@ const createActivationCodeSchema = z.object({
   maxUses: z.number().int().positive().default(1),
   // 如果选择绑定已有机器人，提供 robot_id
   robotId: z.string().optional(),
+  // 批量生成数量（默认1）
+  batchCount: z.number().int().positive().max(100).default(1),
 });
 
 /**
@@ -120,12 +121,25 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * 生成8位随机激活码（大写字母+数字）
+ */
+function generateActivationCode(): string {
+  return Array.from({ length: 8 }, () =>
+    Math.random() < 0.5
+      ? String.fromCharCode(65 + Math.floor(Math.random() * 26)) // A-Z
+      : String.fromCharCode(48 + Math.floor(Math.random() * 10))  // 0-9
+  ).join('').toUpperCase();
+}
+
+/**
  * 创建激活码
  * POST /api/activation-codes
  *
  * 支持两种模式：
  * 1. 管理员预配置机器人后生成激活码（type=admin_dispatch）
  * 2. 纯激活码激活时自动创建机器人（type=pure_code）
+ *
+ * 支持批量生成
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
@@ -144,6 +158,17 @@ export async function POST(request: NextRequest) {
     const validatedData = createActivationCodeSchema.parse(body);
 
     console.log('创建激活码请求:', validatedData);
+
+    // 批量生成数量
+    const batchCount = validatedData.batchCount || 1;
+
+    // 如果绑定机器人，只能生成1个
+    if (validatedData.robotId && batchCount > 1) {
+      return NextResponse.json(
+        { success: false, error: "绑定机器人模式只能生成1个激活码" },
+        { status: 400 }
+      );
+    }
 
     // 模式A：如果选择了绑定机器人，验证机器人是否存在且未被绑定
     if (validatedData.robotId) {
@@ -174,48 +199,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 生成8位随机激活码（大写字母+数字）
-    const code = Array.from({ length: 8 }, () =>
-      Math.random() < 0.5
-        ? String.fromCharCode(65 + Math.floor(Math.random() * 26)) // A-Z
-        : String.fromCharCode(48 + Math.floor(Math.random() * 10))  // 0-9
-    ).join('').toUpperCase();
-
     // 计算过期时间
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + validatedData.validityPeriod);
 
-    // 插入激活码（使用实际存在的字段）
-    const newCodeResult = await client.query(
-      `INSERT INTO activation_codes (
-        code, status, type, max_uses, used_count,
-        remark, created_by, expires_at, robot_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *`,
-      [
-        code,
-        'unused', // 状态：unused（未使用）
-        validatedData.type,
-        validatedData.maxUses,
-        0, // 已使用次数
-        validatedData.notes || null, // 使用 remark 字段存储 notes
-        user.userId,
-        expiresAt.toISOString(),
-        validatedData.robotId || null,
-      ]
-    );
+    // 批量生成激活码
+    const createdCodes: any[] = [];
 
-    const newCode = newCodeResult.rows[0];
+    for (let i = 0; i < batchCount; i++) {
+      // 生成激活码
+      const code = generateActivationCode();
 
-    console.log('激活码创建成功:', newCode);
+      // 插入激活码（使用实际存在的字段）
+      const newCodeResult = await client.query(
+        `INSERT INTO activation_codes (
+          code, status, type, max_uses, used_count,
+          remark, created_by, expires_at, robot_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *`,
+        [
+          code,
+          'unused', // 状态：unused（未使用）
+          validatedData.type,
+          validatedData.maxUses,
+          0, // 已使用次数
+          validatedData.notes || null, // 使用 remark 字段存储 notes
+          user.userId,
+          expiresAt.toISOString(),
+          validatedData.robotId || null,
+        ]
+      );
+
+      createdCodes.push(newCodeResult.rows[0]);
+    }
+
+    console.log('激活码创建成功:', createdCodes.length, '个');
 
     return NextResponse.json({
       success: true,
-      data: newCode,
-      message: validatedData.robotId
-        ? "激活码创建成功，已绑定机器人"
-        : "激活码创建成功，激活时将自动创建机器人",
+      data: createdCodes,
+      message: batchCount > 1
+        ? `成功创建 ${batchCount} 个激活码`
+        : (validatedData.robotId
+          ? "激活码创建成功，已绑定机器人"
+          : "激活码创建成功，激活时将自动创建机器人"),
     });
   } catch (error: any) {
     console.error("创建激活码错误:", error);

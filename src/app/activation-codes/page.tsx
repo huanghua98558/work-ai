@@ -82,6 +82,8 @@ export default function ActivationCodesPage() {
   const [robotName, setRobotName] = useState('');
   const [validityPeriod, setValidityPeriod] = useState('365');
   const [notes, setNotes] = useState('');
+  const [batchCount, setBatchCount] = useState('1'); // 批量生成数量
+  const [isCreating, setIsCreating] = useState(false); // 创建中状态
   
   // 编辑激活码弹窗
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -135,10 +137,13 @@ export default function ActivationCodesPage() {
   // 生成激活码
   const handleCreateCode = async () => {
     try {
+      setIsCreating(true);
+
       const requestBody: any = {
         validityPeriod: parseInt(validityPeriod),
         notes,
         type: bindMode === 'existing' ? 'admin_dispatch' : 'pure_code',
+        batchCount: parseInt(batchCount), // 批量生成数量
       };
 
       if (bindMode === 'existing' && selectedRobotId) {
@@ -154,18 +159,28 @@ export default function ActivationCodesPage() {
       const data = await res.json();
 
       if (data.success) {
-        alert('激活码生成成功！');
+        const count = data.data.length || 1;
+        alert(`成功生成 ${count} 个激活码！`);
         setCreateDialogOpen(false);
         setSelectedRobotId('');
         setRobotName('');
         setNotes('');
+        setBatchCount('1');
         await loadData();
       } else {
         alert(`生成失败：${data.error}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('生成激活码失败:', error);
-      alert('生成失败，请稍后重试');
+      if (error.message?.includes('401') || error.message?.includes('未授权')) {
+        alert('登录已过期，请重新登录');
+        // 可以在这里添加跳转到登录页的逻辑
+        window.location.href = '/login';
+      } else {
+        alert('生成失败，请稍后重试');
+      }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -634,6 +649,28 @@ export default function ActivationCodesPage() {
             </div>
 
             <div className="space-y-2">
+              <Label>生成数量</Label>
+              <Select value={batchCount} onValueChange={setBatchCount}>
+                <SelectTrigger>
+                  <SelectValue placeholder="选择生成数量" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 个</SelectItem>
+                  <SelectItem value="5">5 个</SelectItem>
+                  <SelectItem value="10">10 个</SelectItem>
+                  <SelectItem value="20">20 个</SelectItem>
+                  <SelectItem value="50">50 个</SelectItem>
+                  <SelectItem value="100">100 个</SelectItem>
+                </SelectContent>
+              </Select>
+              {bindMode === 'existing' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  ⚠️ 绑定机器人模式只能生成 1 个激活码
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label>备注（可选）</Label>
               <Textarea
                 placeholder="请输入备注信息"
@@ -647,8 +684,8 @@ export default function ActivationCodesPage() {
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleCreateCode} disabled={loading}>
-              {loading ? '生成中...' : '生成激活码'}
+            <Button onClick={handleCreateCode} disabled={loading || isCreating}>
+              {isCreating ? '生成中...' : '生成激活码'}
             </Button>
           </DialogFooter>
         </DialogContent>
