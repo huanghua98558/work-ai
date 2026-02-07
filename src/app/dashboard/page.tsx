@@ -19,6 +19,9 @@ import {
   ArrowUpRight,
   Plus,
   Settings,
+  Zap,
+  Shield,
+  Globe,
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -93,168 +96,181 @@ export default function DashboardPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        {/* 欢迎区域 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              欢迎回来！
+        {/* 欢迎区域 - 使用渐变背景 */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-900 dark:via-indigo-900 dark:to-purple-900 p-8">
+          <div className="relative">
+            <div className="inline-block px-4 py-2 mb-4 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+              <span className="text-white/90 text-sm font-medium">欢迎回来，开始管理您的机器人</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              WorkBot 控制台
             </h1>
-            <p className="mt-1 text-gray-600 dark:text-gray-300">
-              这里是 WorkBot 控制台，您可以管理所有机器人和系统设置
+            <p className="text-xl text-blue-100 mb-6 max-w-2xl">
+              多平台智能机器人管理系统，统一管理企业微信、微信、小程序等多个平台的机器人
             </p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/settings">
-              <Button variant="outline">
-                <Settings className="mr-2 h-4 w-4" />
-                设置
-              </Button>
-            </Link>
-            <Link href="/robots">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                创建机器人
-              </Button>
-            </Link>
+            <div className="flex gap-3">
+              <Link href="/robots">
+                <Button className="bg-white text-blue-600 hover:bg-blue-50">
+                  <Plus className="mr-2 h-4 w-4" />
+                  创建机器人
+                </Button>
+              </Link>
+              <Link href="/settings">
+                <Button variant="outline" className="bg-transparent text-white border-white/50 hover:bg-white/10">
+                  <Settings className="mr-2 h-4 w-4" />
+                  系统设置
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* 统计卡片 */}
+        {/* 统计卡片 - 使用渐变背景 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">机器人总数</CardTitle>
-              <Bot className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-blue-50">机器人总数</CardTitle>
+              <Bot className="h-4 w-4 text-blue-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalRobots}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{stats.totalRobots}</div>
+              <p className="text-sm text-blue-100 mt-1">
                 {stats.activeRobots} 个在线
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">激活码数量</CardTitle>
-              <Key className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-green-50">激活码数量</CardTitle>
+              <Key className="h-4 w-4 text-green-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalActivationCodes}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{stats.totalActivationCodes}</div>
+              <p className="text-sm text-green-100 mt-1">
                 可用于激活新设备
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">对话总数</CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-purple-50">对话总数</CardTitle>
+              <MessageSquare className="h-4 w-4 text-purple-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalConversations}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{stats.totalConversations}</div>
+              <p className="text-sm text-purple-100 mt-1">
                 历史对话记录
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">消息总数</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-orange-50">消息总数</CardTitle>
+              <Activity className="h-4 w-4 text-orange-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalMessages}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{stats.totalMessages}</div>
+              <p className="text-sm text-orange-100 mt-1">
                 今日新增 {stats.todayMessages} 条
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-pink-500 to-pink-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">活跃用户</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-pink-50">活跃用户</CardTitle>
+              <Users className="h-4 w-4 text-pink-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">28</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">28</div>
+              <p className="text-sm text-pink-100 mt-1">
                 最近 7 天活跃
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">响应速度</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-cyan-50">响应速度</CardTitle>
+              <Clock className="h-4 w-4 text-cyan-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1.2s</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">1.2s</div>
+              <p className="text-sm text-cyan-100 mt-1">
                 平均响应时间
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* 快速操作 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>快速操作</CardTitle>
-            <CardDescription>常用的管理功能</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Link href="/robots">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <Bot className="h-6 w-6" />
-                  <span>管理机器人</span>
-                </Button>
-              </Link>
-              <Link href="/activation-codes">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <Key className="h-6 w-6" />
-                  <span>生成激活码</span>
-                </Button>
-              </Link>
-              <Link href="/knowledge">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <Activity className="h-6 w-6" />
-                  <span>知识库管理</span>
-                </Button>
-              </Link>
-              <Link href="/messages">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <MessageSquare className="h-6 w-6" />
-                  <span>查看消息</span>
-                </Button>
-              </Link>
+        {/* 快速操作 - 使用彩色卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Link href="/robots">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-blue-200 dark:border-blue-800">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-4">
+                <Bot className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">管理机器人</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">配置和管理您的机器人</p>
             </div>
-          </CardContent>
-        </Card>
+          </Link>
 
-        {/* 最近对话和活跃机器人 */}
+          <Link href="/activation-codes">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-green-200 dark:border-green-800">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-4">
+                <Key className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">生成激活码</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">创建和管理激活码</p>
+            </div>
+          </Link>
+
+          <Link href="/knowledge">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-purple-200 dark:border-purple-800">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-4">
+                <Activity className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">知识库管理</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">上传和管理文档</p>
+            </div>
+          </Link>
+
+          <Link href="/messages">
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer border border-orange-200 dark:border-orange-800">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mb-4">
+                <MessageSquare className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">查看消息</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">查看对话记录</p>
+            </div>
+          </Link>
+        </div>
+
+        {/* 最近对话和活跃机器人 - 使用白色卡片，但保持一致性 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 最近对话 */}
-          <Card>
-            <CardHeader>
+          <Card className="border-2 border-blue-100 dark:border-blue-900">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>最近对话</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-blue-600" />
+                    最近对话
+                  </CardTitle>
                   <CardDescription>最新的对话记录</CardDescription>
                 </div>
                 <Link href="/messages">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="text-blue-600">
                     查看全部
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -285,22 +301,25 @@ export default function DashboardPage() {
           </Card>
 
           {/* 活跃机器人 */}
-          <Card>
-            <CardHeader>
+          <Card className="border-2 border-green-100 dark:border-green-900">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>活跃机器人</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-green-600" />
+                    活跃机器人
+                  </CardTitle>
                   <CardDescription>最近活跃的机器人</CardDescription>
                 </div>
                 <Link href="/robots">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="text-green-600">
                     查看全部
                     <ArrowUpRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -329,18 +348,21 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* 使用趋势 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>使用趋势</CardTitle>
+        {/* 使用趋势 - 使用渐变背景 */}
+        <Card className="border-2 border-purple-100 dark:border-purple-900">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+              使用趋势
+            </CardTitle>
             <CardDescription>最近 7 天的消息统计</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="h-64 flex items-end justify-between gap-2">
               {[120, 156, 189, 234, 289, 312, 367].map((value, index) => (
                 <div key={index} className="flex-1 flex flex-col items-center gap-2">
                   <div
-                    className="w-full bg-blue-500 rounded-t transition-all hover:bg-blue-600"
+                    className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all hover:from-blue-700 hover:to-blue-500"
                     style={{ height: `${(value / 400) * 100}%` }}
                   />
                   <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -348,6 +370,38 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 平台支持卡片 - 新增 */}
+        <Card className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white border-0">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-bold mb-2">支持多平台</h3>
+                <p className="text-indigo-100">同时支持企业微信、微信公众号、微信小程序等多个平台</p>
+              </div>
+              <div className="flex gap-4">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-2">
+                    <Globe className="h-8 w-8" />
+                  </div>
+                  <div className="text-sm">企业微信</div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-2">
+                    <Shield className="h-8 w-8" />
+                  </div>
+                  <div className="text-sm">公众号</div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-2">
+                    <Zap className="h-8 w-8" />
+                  </div>
+                  <div className="text-sm">小程序</div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
