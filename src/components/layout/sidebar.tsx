@@ -13,6 +13,7 @@ import {
   LogOut,
   User,
   Settings,
+  Wifi,
 } from 'lucide-react';
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600' },
   { name: '消息中心', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600' },
   { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600' },
+  { name: 'WebSocket', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600' },
   { name: '系统监控', href: '/admin/errors', icon: Activity, gradient: 'from-orange-500 to-red-600' },
   { name: '用户管理', href: '/users', icon: User, gradient: 'from-teal-500 to-green-600' },
   { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600' },

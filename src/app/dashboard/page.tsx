@@ -22,6 +22,8 @@ import {
   Zap,
   Shield,
   Globe,
+  Wifi,
+  WifiOff,
 } from 'lucide-react'
 
 // 缓存键常量
@@ -87,6 +89,15 @@ export default function DashboardPage() {
   const [recentRobots, setRecentRobots] = useState<any[]>([])
   const [recentActivationCodes, setRecentActivationCodes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [websocketData, setWebsocketData] = useState<{
+    totalConnections: number;
+    onlineRobots: any[];
+    serverStatus: string;
+  }>({
+    totalConnections: 0,
+    onlineRobots: [],
+    serverStatus: 'unknown',
+  })
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
 
   // 模拟API数据获取（实际应该调用后端API）
@@ -173,6 +184,17 @@ export default function DashboardPage() {
       setCachedData(CACHE_KEYS.CONVERSATIONS, newConversations)
       setCachedData(CACHE_KEYS.ROBOTS, newRobots)
       setCachedData('dashboard_activation_codes', apiData.recentActivationCodes || [])
+
+      // 获取 WebSocket 数据
+      try {
+        const wsResponse = await fetch('/api/websocket/monitor', { headers })
+        const wsData = await wsResponse.json()
+        if (wsData.success) {
+          setWebsocketData(wsData.data)
+        }
+      } catch (error) {
+        console.error('获取 WebSocket 数据失败:', error)
+      }
     } catch (error: any) {
       console.error('Failed to refresh data:', error)
       // 使用缓存数据作为fallback
@@ -589,6 +611,111 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* WebSocket 监控板块 */}
+        <Card className="border-2 border-yellow-100 dark:border-yellow-900">
+          <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Wifi className="h-5 w-5 text-yellow-600" />
+                  WebSocket 连接监控
+                </CardTitle>
+                <CardDescription>实时监控 WebSocket 连接状态和在线机器人</CardDescription>
+              </div>
+              <Link href="/websocket">
+                <Button variant="ghost" size="sm" className="text-yellow-600">
+                  查看详情
+                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* 服务器状态 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      websocketData.serverStatus === 'running'
+                        ? 'bg-green-100 dark:bg-green-900'
+                        : 'bg-red-100 dark:bg-red-900'
+                    }`}
+                  >
+                    <Activity className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">服务器状态</div>
+                    <div className="text-sm font-semibold">
+                      {websocketData.serverStatus === 'running' ? '运行中' : '已停止'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">连接数</div>
+                    <div className="text-sm font-semibold">{websocketData.totalConnections}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                    <Wifi className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">在线机器人</div>
+                    <div className="text-sm font-semibold">{websocketData.onlineRobots.length}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 在线机器人列表 */}
+              {websocketData.onlineRobots.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    在线机器人列表
+                  </div>
+                  {websocketData.onlineRobots.slice(0, 5).map((robot: any) => (
+                    <div
+                      key={robot.robotId}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                          <Wifi className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {robot.robotId}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            连接时间: {new Date(robot.connectedAt).toLocaleTimeString('zh-CN')}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge
+                        variant="default"
+                        className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                      >
+                        在线
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                  <WifiOff className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">暂无在线机器人</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
