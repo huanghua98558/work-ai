@@ -148,7 +148,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-3xl font-bold">{stats.totalActivationCodes}</div>
               <p className="text-sm text-green-100 mt-1">
-                可用于激活新设备
+                85 未使用 · 35 已使用
               </p>
             </CardContent>
           </Card>
@@ -306,8 +306,8 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* 最近对话和活跃机器人 - 使用白色卡片，但保持一致性 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 最近对话、活跃机器人和最近激活码 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 最近对话 */}
           <Card className="border-2 border-blue-100 dark:border-blue-900">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
@@ -333,9 +333,7 @@ export default function DashboardPage() {
                   <TableRow>
                     <TableHead>机器人</TableHead>
                     <TableHead>用户</TableHead>
-                    <TableHead>最后消息</TableHead>
                     <TableHead>时间</TableHead>
-                    <TableHead>状态</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -343,13 +341,7 @@ export default function DashboardPage() {
                     <TableRow key={conv.id}>
                       <TableCell className="font-medium">{conv.robotName}</TableCell>
                       <TableCell>{conv.user}</TableCell>
-                      <TableCell className="max-w-xs truncate">{conv.lastMessage}</TableCell>
                       <TableCell>{conv.time}</TableCell>
-                      <TableCell>
-                        <Badge variant={conv.status === 'active' ? 'default' : 'secondary'}>
-                          {conv.status === 'active' ? '进行中' : '已结束'}
-                        </Badge>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -383,7 +375,6 @@ export default function DashboardPage() {
                     <TableHead>名称</TableHead>
                     <TableHead>状态</TableHead>
                     <TableHead>消息数</TableHead>
-                    <TableHead>最后活跃</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -396,9 +387,63 @@ export default function DashboardPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{robot.messages}</TableCell>
-                      <TableCell>{robot.lastActive}</TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* 最近激活码 */}
+          <Card className="border-2 border-green-100 dark:border-green-900">
+            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="h-5 w-5 text-green-600" />
+                    最近激活码
+                  </CardTitle>
+                  <CardDescription>最近生成或使用的激活码</CardDescription>
+                </div>
+                <Link href="/activation-codes">
+                  <Button variant="ghost" size="sm" className="text-green-600">
+                    查看全部
+                    <ArrowUpRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>激活码</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>时间</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">ABCD1234</TableCell>
+                    <TableCell>
+                      <Badge variant="default" className="bg-green-500">未使用</Badge>
+                    </TableCell>
+                    <TableCell>2分钟前</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">EFGH5678</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">已使用</Badge>
+                    </TableCell>
+                    <TableCell>1小时前</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">IJKL9012</TableCell>
+                    <TableCell>
+                      <Badge variant="default" className="bg-green-500">未使用</Badge>
+                    </TableCell>
+                    <TableCell>3小时前</TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
