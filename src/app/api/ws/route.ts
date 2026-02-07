@@ -12,11 +12,18 @@ export async function GET(request: NextRequest) {
   const robotId = searchParams.get("robotId");
   const token = searchParams.get("token");
 
+  // 动态生成 WebSocket 地址
+  const protocol = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol;
+  const host = request.headers.get('x-forwarded-host') || request.nextUrl.host;
+  // x-forwarded-proto 可能是 "https" 或 "https:"，需要统一处理
+  const wsProtocol = protocol.includes('https') ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${host}/ws?robotId=${robotId}&token=${token}`;
+
   return new Response(
     JSON.stringify({
       message: "WebSocket endpoint",
       usage: "请使用 WebSocket 客户端连接此端点",
-      url: `ws://localhost:5000/api/ws?robotId=${robotId}&token=${token}`,
+      url: wsUrl,
       note: "Next.js 需要自定义服务器支持 WebSocket",
     }),
     {

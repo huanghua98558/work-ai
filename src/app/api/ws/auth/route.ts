@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
  *
  * 注意：完整的WebSocket服务器需要单独部署，使用以下配置：
  *
- * 服务器地址: ws://localhost:5000/ws
+ * 服务器地址: wss://your-domain/ws (生产环境) 或 ws://localhost:5000/ws (开发环境)
  *
  * 认证流程：
  * 1. 客户端连接WebSocket

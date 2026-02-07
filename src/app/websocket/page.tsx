@@ -40,6 +40,11 @@ export default function WebSocketMonitorPage() {
   const [data, setData] = useState<WebSocketMonitorData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // 动态生成 WebSocket 地址
+  const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsHost = typeof window !== 'undefined' ? window.location.host : 'localhost:5000';
+  const wsAddress = `${wsProtocol}//${wsHost}/ws`;
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -290,13 +295,40 @@ export default function WebSocketMonitorPage() {
               <div>
                 <h3 className="text-lg font-semibold mb-2">WebSocket 连接信息</h3>
                 <div className="space-y-1 text-sm text-yellow-100">
-                  <p>• 服务器地址: <code className="bg-white/20 px-2 py-1 rounded">ws://localhost:5000/ws</code></p>
+                  <p>• 服务器地址: <code className="bg-white/20 px-2 py-1 rounded">{wsAddress}</code></p>
                   <p>• 认证参数: <code className="bg-white/20 px-2 py-1 rounded">robotId</code> 和 <code className="bg-white/20 px-2 py-1 rounded">token</code></p>
                   <p>• 心跳间隔: 30 秒</p>
                   <p>• 认证超时: 30 秒</p>
                   <p>• 心跳超时: 60 秒</p>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 测试连接按钮 */}
+        <Card className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Wifi className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">测试 WebSocket 连接</h3>
+                  <p className="text-sm text-blue-100">
+                    测试 WebSocket 服务器是否正常运行，验证连接地址是否正确
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => router.push('/websocket/test')}
+                className="bg-white text-blue-600 hover:bg-blue-50"
+              >
+                测试连接
+              </Button>
             </div>
           </CardContent>
         </Card>
