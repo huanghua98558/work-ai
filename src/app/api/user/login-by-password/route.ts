@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-// 临时硬编码的超级管理员信息（用于测试）
-const SUPER_ADMIN = {
-  phone: 'hh198752',
-  passwordHash: '$2a$10$31JlPAEnDv/VCFFmbU2t8eIu5QfInUMPz0hRZHwaIWv7ahLtbpF36', // 重新生成的正确哈希
-  id: 3,
-  nickname: '超级管理员',
-  role: 'admin',
-  status: 'active',
-  avatar: null,
-};
+import { execSql } from '@/lib/db-helper';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,16 +16,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 临时：只允许超级管理员登录
-    if (phone !== SUPER_ADMIN.phone) {
+    // 从数据库查询用户
+    const users = await execSql(
+      'SELECT id, phone, password_hash, nickname, role, status, avatar FROM users WHERE phone = $1 AND status = $2',
+      [phone, 'active']
+    );
+
+    if (!users || users.length === 0) {
       return NextResponse.json(
         { success: false, error: '账号或密码错误' },
         { status: 401 }
       );
     }
 
+    const user = users[0];
+
     // 验证密码
-    const isPasswordValid = await bcrypt.compare(password, SUPER_ADMIN.passwordHash);
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       return NextResponse.json(
         { success: false, error: '账号或密码错误' },
@@ -43,12 +40,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 更新最后登录时间
+    await execSql('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
+
     // 生成 JWT Token
     const token = jwt.sign(
       {
-        userId: SUPER_ADMIN.id,
-        phone: SUPER_ADMIN.phone,
-        role: SUPER_ADMIN.role,
+        userId: user.id,
+        phone: user.phone,
+        role: user.role,
       },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '30d' }
@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
       data: {
         token,
         user: {
-          id: SUPER_ADMIN.id,
-          phone: SUPER_ADMIN.phone,
-          nickname: SUPER_ADMIN.nickname,
-          role: SUPER_ADMIN.role,
-          avatar: SUPER_ADMIN.avatar,
+          id: user.id,
+          phone: user.phone,
+          nickname: user.nickname,
+          role: user.role,
+          avatar: user.avatar,
         },
       },
     });

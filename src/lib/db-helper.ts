@@ -2,11 +2,17 @@
 import { Pool } from 'pg';
 
 // 创建数据库连接池
+const connectionString = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
+console.log('数据库连接字符串:', connectionString);
+
 const pool = new Pool({
-  connectionString: process.env.PGDATABASE_URL || process.env.DATABASE_URL,
+  connectionString: connectionString,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000, // 增加超时时间
+  connectionTimeoutMillis: 30000, // 增加连接超时时间到 30 秒
+  ssl: {
+    rejectUnauthorized: false, // 禁用 SSL 证书验证（用于测试）
+  },
 });
 
 // 连接测试
