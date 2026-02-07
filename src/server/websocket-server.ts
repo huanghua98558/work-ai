@@ -1,4 +1,4 @@
-import { Server as WebSocketServer } from 'ws';
+import WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 import { verifyToken, JWTPayload } from '@/lib/jwt';
 import { getDatabase } from '@/lib/db';
@@ -26,7 +26,7 @@ let heartbeatTimer: NodeJS.Timeout | null = null;
  * 初始化 WebSocket 服务器
  */
 export function initializeWebSocketServer(server: any) {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new (WebSocket as any).Server({ noServer: true });
 
   // 处理 HTTP 升级请求
   server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
@@ -34,7 +34,7 @@ export function initializeWebSocketServer(server: any) {
     
     // 只处理 /ws 路径
     if (pathname === '/ws') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.handleUpgrade(request, socket, head, (ws: any) => {
         wss.emit('connection', ws, request);
       });
     } else {
@@ -289,4 +289,11 @@ export function getOnlineRobots(): string[] {
  */
 export function getConnectionCount(): number {
   return connections.size;
+}
+
+/**
+ * 发送 WebSocket 消息（给其他模块使用）
+ */
+export function sendWebSocketMessage(robotId: string, message: any): boolean {
+  return sendToRobot(robotId, message);
 }
