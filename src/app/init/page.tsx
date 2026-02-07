@@ -1,7 +1,7 @@
 // 强制动态渲染，避免构建时执行
-export const dynamic = 'force-dynamic';
-
 'use client';
+
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
