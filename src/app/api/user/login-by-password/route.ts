@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { execSql } from '@/lib/db-helper';
+import { userStore } from '@/lib/user-store';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,24 +15,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 从数据库查询用户
-    const users = await execSql(
-      'SELECT id, phone, password_hash, nickname, role, status, avatar FROM users WHERE phone = $1 AND status = $2',
-      [phone, 'active']
-    );
+    // 从用户存储查询并验证密码
+    const user = await userStore.verifyPassword(phone, password);
 
-    if (!users || users.length === 0) {
-      return NextResponse.json(
-        { success: false, error: '账号或密码错误' },
-        { status: 401 }
-      );
-    }
-
-    const user = users[0];
-
-    // 验证密码
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) {
+    if (!user) {
       return NextResponse.json(
         { success: false, error: '账号或密码错误' },
         { status: 401 }
@@ -41,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 更新最后登录时间
-    await execSql('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
+    await userStore.updateLastLogin(user.id);
 
     // 生成 JWT Token
     const token = jwt.sign(
