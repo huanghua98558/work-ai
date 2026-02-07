@@ -79,8 +79,6 @@ export default function ActivationCodesPage() {
   
   // 生成激活码弹窗
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedRobotId, setSelectedRobotId] = useState(''); // 绑定的机器人ID（可选）
-  const [robotName, setRobotName] = useState('');
   const [validityPeriod, setValidityPeriod] = useState('365');
   const [notes, setNotes] = useState('');
   const [batchCount, setBatchCount] = useState('1'); // 批量生成数量
@@ -188,26 +186,11 @@ export default function ActivationCodesPage() {
     try {
       setIsCreating(true);
 
-      // 验证：批量生成时不能绑定机器人
-      if (selectedRobotId && parseInt(batchCount) > 1) {
-        toast({
-          title: '验证失败',
-          description: '绑定机器人模式只能生成1个激活码',
-          variant: 'destructive',
-        });
-        setIsCreating(false);
-        return;
-      }
-
       const requestBody: any = {
         validityPeriod: parseInt(validityPeriod),
         notes,
         batchCount: parseInt(batchCount), // 批量生成数量
       };
-
-      if (selectedRobotId) {
-        requestBody.robotId = selectedRobotId;
-      }
 
       const token = localStorage.getItem('token');
       const headers: HeadersInit = {
@@ -230,14 +213,19 @@ export default function ActivationCodesPage() {
       if (data.success) {
         const newCodes = data.data || [];
         const count = Array.isArray(newCodes) ? newCodes.length : 1;
+
+        // 生成成功信息
+        const message = count === 1
+          ? `激活码：${newCodes[0].code}\n机器人ID：${newCodes[0].robotId}\n请复制给用户激活`
+          : `成功生成 ${count} 个激活码！`;
+
         toast({
           title: '创建成功',
-          description: `成功生成 ${count} 个激活码！`,
+          description: message,
           variant: 'success',
         });
+
         setCreateDialogOpen(false);
-        setSelectedRobotId('');
-        setRobotName('');
         setNotes('');
         setBatchCount('1');
         // 立即刷新列表
@@ -757,31 +745,10 @@ export default function ActivationCodesPage() {
           <DialogHeader>
             <DialogTitle>生成新激活码</DialogTitle>
             <DialogDescription>
-              {selectedRobotId
-                ? '激活时将使用绑定的机器人'
-                : '激活时自动创建新机器人'}
+              生成激活码时将自动创建机器人，请复制激活码和机器人ID给用户
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>绑定机器人（可选）</Label>
-              <Select value={selectedRobotId} onValueChange={setSelectedRobotId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="不选择则激活时自动创建机器人" />
-                </SelectTrigger>
-                <SelectContent>
-                  {robots.filter(r => r.status !== 'deleted').map(robot => (
-                    <SelectItem key={robot.robot_id} value={robot.robot_id}>
-                      {robot.name} ({robot.robot_id})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                💡 不选择机器人时，激活时会自动创建新机器人
-              </p>
-            </div>
-
             <div className="space-y-2">
               <Label>有效期</Label>
               <Select value={validityPeriod} onValueChange={setValidityPeriod}>
@@ -798,7 +765,7 @@ export default function ActivationCodesPage() {
 
             <div className="space-y-2">
               <Label>生成数量</Label>
-              <Select value={batchCount} onValueChange={setBatchCount} disabled={!!selectedRobotId}>
+              <Select value={batchCount} onValueChange={setBatchCount}>
                 <SelectTrigger>
                   <SelectValue placeholder="选择生成数量" />
                 </SelectTrigger>
@@ -811,11 +778,6 @@ export default function ActivationCodesPage() {
                   <SelectItem value="100">100 个</SelectItem>
                 </SelectContent>
               </Select>
-              {selectedRobotId && (
-                <p className="text-xs text-gray-500 mt-1">
-                  ⚠️ 绑定机器人后只能生成 1 个激活码
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">

@@ -10,13 +10,21 @@ import { z } from "zod";
  * 绑定机器人验证 Schema
  */
 const bindRobotSchema = z.object({
-  // 机器人ID（必填）
-  robotId: z.string().min(1),
+  // 激活码（可选）
+  activationCode: z.string().optional(),
+  // 机器人ID（可选）
+  robotId: z.string().optional(),
   // 用户自定义名称（可选）
   name: z.string().max(100).optional(),
   // 描述（可选）
   description: z.string().optional(),
-});
+}).refine(
+  (data) => data.activationCode || data.robotId,
+  { message: "必须提供激活码或机器人ID" }
+).refine(
+  (data) => !(data.activationCode && data.robotId),
+  { message: "只能提供激活码或机器人ID之一" }
+);
 
 /**
  * 获取用户的机器人列表
@@ -104,8 +112,8 @@ export async function GET(request: NextRequest) {
  * 绑定机器人到用户账户
  * POST /api/robots
  *
- * 用户通过机器人ID绑定已存在的机器人到自己的账户
- * 注意：不使用激活码，激活码只能由APP端使用
+ * 用户可以通过激活码或机器人ID绑定机器人到自己的账户
+ * 二选一，激活码或机器人ID
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
@@ -117,19 +125,72 @@ export async function POST(request: NextRequest) {
 
     console.log('绑定机器人请求:', {
       userId: user.userId,
+      activationCode: validatedData.activationCode,
       robotId: validatedData.robotId,
       name: validatedData.name,
     });
 
-    // 验证机器人是否存在
+    let robotId = null;
+
+    // 模式1：通过激活码绑定
+    if (validatedData.activationCode) {
+      const codeResult = await client.query(
+        `SELECT * FROM activation_codes
+         WHERE code = $1
+         LIMIT 1`,
+        [validatedData.activationCode.toUpperCase()]
+      );
+
+      if (codeResult.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "激活码不存在" },
+          { status: 404 }
+        );
+      }
+
+      const code = codeResult.rows[0];
+
+      if (!code.robot_id) {
+        return NextResponse.json(
+          { success: false, error: "激活码未绑定机器人" },
+          { status: 400 }
+        );
+      }
+
+      robotId = code.robot_id;
+    } else if (validatedData.robotId) {
+      // 模式2：通过机器人ID绑定
+      const robotResult = await client.query(
+        `SELECT * FROM robots WHERE bot_id = $1 LIMIT 1`,
+        [validatedData.robotId]
+      );
+
+      if (robotResult.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "指定的机器人不存在" },
+          { status: 404 }
+        );
+      }
+
+      robotId = validatedData.robotId;
+    }
+
+    if (!robotId) {
+      return NextResponse.json(
+        { success: false, error: "无法确定机器人ID" },
+        { status: 500 }
+      );
+    }
+
+    // 获取机器人信息
     const robotResult = await client.query(
       `SELECT * FROM robots WHERE bot_id = $1`,
-      [validatedData.robotId]
+      [robotId]
     );
 
     if (robotResult.rows.length === 0) {
       return NextResponse.json(
-        { success: false, error: "指定的机器人不存在" },
+        { success: false, error: "机器人不存在" },
         { status: 404 }
       );
     }
