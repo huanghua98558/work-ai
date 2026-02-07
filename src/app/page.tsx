@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
 export default function Home() {
@@ -13,16 +12,16 @@ export default function Home() {
             企业微信机器人管理系统
           </p>
           <div className="space-x-4">
-            <Link href="/login">
+            <a href="/login">
               <Button size="lg">
                 立即开始
               </Button>
-            </Link>
-            <Link href="/docs">
+            </a>
+            <a href="/docs">
               <Button size="lg" variant="outline">
                 查看文档
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
 
