@@ -51,6 +51,7 @@
     "@types/uuid": "^11.0.0",
     "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.17",
+    "dotenv": "^17.2.4",
     "drizzle-kit": "^0.31.8",
     "eslint": "^8.56.0",
     "eslint-config-next": "^15.0.0",

@@ -1,6 +1,10 @@
+import { config } from 'dotenv';
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "../storage/database/shared/schema";
+
+// 加载环境变量
+config();
 
 // 从环境变量获取数据库连接字符串
 const connectionString = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
