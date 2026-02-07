@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import bcrypt from 'bcryptjs';
 
 /**
  * 初始化默认管理员账户
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // 生成密码哈希
+    const passwordHash = await bcrypt.hash(password, 10);
+
     // 检查用户是否已存在
     const existingUser = await client.query(
       `SELECT id, phone, role, status FROM users WHERE phone = $1`,
@@ -32,8 +36,8 @@ export async function POST(request: Request) {
     if (existingUser.rows.length > 0) {
       // 如果用户已存在，更新为管理员
       await client.query(
-        `UPDATE users SET role = 'admin', status = 'active', nickname = $1 WHERE phone = $2`,
-        [nickname || '管理员', phone]
+        `UPDATE users SET role = 'admin', status = 'active', nickname = $1, password_hash = $2 WHERE phone = $3`,
+        [nickname || '管理员', passwordHash, phone]
       );
       return NextResponse.json({
         success: true,
@@ -42,12 +46,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // 创建新管理员账户（密码暂时存储为明文，生产环境应使用bcrypt）
+    // 创建新管理员账户（使用bcrypt哈希密码）
     const newUserResult = await client.query(
       `INSERT INTO users (phone, nickname, role, status, password_hash)
       VALUES ($1, $2, 'admin', 'active', $3)
       RETURNING id, phone, nickname, role, status, created_at`,
-      [phone, nickname || '管理员', password]
+      [phone, nickname || '管理员', passwordHash]
     );
 
     return NextResponse.json({
