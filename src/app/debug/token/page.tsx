@@ -1,198 +1,272 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { MainLayout } from '@/components/layout/main-layout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Key, RefreshCw, LogOut, CheckCircle, AlertCircle, Copy } from 'lucide-react';
 
-export default function TokenDebugPage() {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [testResult, setTestResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+export default function DebugTokenPage() {
+  const { toast } = useToast();
+  const [tokenInfo, setTokenInfo] = useState<any>(null);
+  const [valid, setValid] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 读取 token 和 user
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    setToken(savedToken);
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        setUser(null);
-      }
-    }
+    analyzeToken();
   }, []);
 
-  const testToken = async () => {
-    if (!token) {
-      alert('没有找到 token，请先登录');
-      return;
-    }
-
-    setLoading(true);
-    setTestResult(null);
-
+  const analyzeToken = () => {
     try {
-      const response = await fetch('/api/robots', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setTokenInfo({ exists: false });
+        setValid(false);
+        return;
+      }
+
+      // 解析 Token
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        setTokenInfo({ exists: true, valid: false, error: 'Token 格式不正确' });
+        setValid(false);
+        return;
+      }
+
+      const header = JSON.parse(atob(parts[0]));
+      const payload = JSON.parse(atob(parts[1]));
+      const signature = parts[2];
+
+      setTokenInfo({
+        exists: true,
+        valid: true,
+        header,
+        payload,
+        signature: signature.substring(0, 20) + '...',
       });
 
-      const data = await response.json();
-
-      setTestResult({
-        success: response.ok,
-        status: response.status,
-        data: data,
-      });
-    } catch (error: any) {
-      setTestResult({
-        success: false,
-        error: error.message,
-      });
+      setValid(true);
+    } catch (error) {
+      console.error('解析 Token 失败:', error);
+      setTokenInfo({ exists: true, valid: false, error: error.message });
+      setValid(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const clearToken = () => {
+  const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-    setTestResult(null);
-    alert('已清除 token，请重新登录');
+    localStorage.removeItem('refreshToken');
+    window.location.href = '/login';
   };
 
+  const copyToken = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigator.clipboard.writeText(token);
+      toast({
+        title: '复制成功',
+        description: 'Token 已复制到剪贴板',
+        variant: 'success',
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-300">分析中...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-          Token 调试工具
-        </h1>
+    <MainLayout>
+      <div className="space-y-6">
+        {/* 页面标题 */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Token 调试工具
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            查看和分析当前登录的 Token 信息
+          </p>
+        </div>
 
         {/* Token 状态 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Token 状态
-          </h2>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
-              <span className="text-gray-700 dark:text-gray-300">Token 是否存在</span>
-              <span className={`font-mono ${token ? 'text-green-600' : 'text-red-600'}`}>
-                {token ? '是' : '否'}
-              </span>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Token 状态
+            </CardTitle>
+            <CardDescription>
+              当前 Token 的有效性状态
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4 p-4 rounded-lg">
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  tokenInfo?.exists && tokenInfo?.valid
+                    ? 'bg-green-100 dark:bg-green-900'
+                    : 'bg-red-100 dark:bg-red-900'
+                }`}
+              >
+                {tokenInfo?.exists && tokenInfo?.valid ? (
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-6 w-6 text-red-600" />
+                )}
+              </div>
+              <div>
+                <div className="text-lg font-semibold">
+                  {tokenInfo?.exists && tokenInfo?.valid ? 'Token 有效' : 'Token 无效'}
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {tokenInfo?.exists ? (tokenInfo?.valid ? '可以正常使用' : '请重新登录') : '未登录'}
+                </div>
+              </div>
             </div>
-            {token && (
-              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                <span className="text-gray-700 dark:text-gray-300 block mb-2">Token 内容：</span>
-                <code className="text-xs text-gray-900 dark:text-white break-all block">
-                  {token}
-                </code>
-              </div>
-            )}
-            {user && (
-              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                <span className="text-gray-700 dark:text-gray-300 block mb-2">用户信息：</span>
-                <pre className="text-xs text-gray-900 dark:text-white overflow-x-auto">
-                  {JSON.stringify(user, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* 测试 Token */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            测试 Token
-          </h2>
-          <div className="flex gap-4">
-            <button
-              onClick={testToken}
-              disabled={!token || loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '测试中...' : '测试 Token'}
-            </button>
-            <button
-              onClick={clearToken}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-            >
-              清除 Token
-            </button>
-          </div>
+            <div className="flex gap-4">
+              <Button
+                onClick={analyzeToken}
+                variant="outline"
+                disabled={loading}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                刷新
+              </Button>
+              <Button
+                onClick={copyToken}
+                variant="outline"
+                disabled={!tokenInfo?.exists}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                复制 Token
+              </Button>
+              <Button
+                onClick={logout}
+                variant="destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                退出登录
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-          {testResult && (
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-                测试结果
-              </h3>
-              <pre className="text-xs text-gray-900 dark:text-white overflow-x-auto">
-                {JSON.stringify(testResult, null, 2)}
+        {/* Token 载荷 */}
+        {tokenInfo?.valid && tokenInfo?.payload && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Token 载荷（Payload）</CardTitle>
+              <CardDescription>
+                Token 中包含的用户信息
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">用户 ID</span>
+                  <span className="text-sm font-medium">{tokenInfo.payload.userId}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">手机号</span>
+                  <span className="text-sm font-medium">{tokenInfo.payload.phone}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">角色</span>
+                  <Badge
+                    variant={tokenInfo.payload.role === 'admin' ? 'default' : 'secondary'}
+                    className={
+                      tokenInfo.payload.role === 'admin'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100'
+                    }
+                  >
+                    {tokenInfo.payload.role === 'admin' ? '管理员' : '普通用户'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">签发时间</span>
+                  <span className="text-sm font-medium">
+                    {new Date(tokenInfo.payload.iat * 1000).toLocaleString('zh-CN')}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg md:col-span-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">过期时间</span>
+                  <span className="text-sm font-medium">
+                    {new Date(tokenInfo.payload.exp * 1000).toLocaleString('zh-CN')}
+                  </span>
+                </div>
+              </div>
+
+              {tokenInfo.payload.role === 'admin' ? (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-green-800 dark:text-green-200 text-sm">
+                    ✅ 您的角色是管理员，可以访问激活码管理等功能
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg space-y-2">
+                  <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                    ⚠️ 您的角色是普通用户，无法访问激活码管理等功能
+                  </p>
+                  <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                    请退出登录后，使用管理员账号重新登录
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Token 头部 */}
+        {tokenInfo?.valid && tokenInfo?.header && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Token 头部（Header）</CardTitle>
+              <CardDescription>
+                Token 的编码算法和类型
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <pre className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs overflow-x-auto">
+                {JSON.stringify(tokenInfo.header, null, 2)}
               </pre>
-            </div>
-          )}
-        </div>
-
-        {/* 解决方案 */}
-        {!token && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold text-yellow-900 dark:text-yellow-100 mb-4">
-              问题诊断
-            </h2>
-            <div className="text-yellow-800 dark:text-yellow-200 space-y-2">
-              <p>❌ 没有找到 token</p>
-              <p className="mt-4"><strong>可能原因：</strong></p>
-              <ul className="list-disc list-inside space-y-1 mt-2">
-                <li>localStorage 被禁用或清除</li>
-                <li>跨域问题导致 localStorage 无法访问</li>
-                <li>浏览器隐私模式</li>
-                <li>未登录或登录失败</li>
-              </ul>
-              <p className="mt-4"><strong>解决方案：</strong></p>
-              <ol className="list-decimal list-inside space-y-1 mt-2">
-                <li>访问 <a href="/login" className="underline">登录页面</a> 重新登录</li>
-                <li>确保浏览器允许使用 localStorage</li>
-                <li>检查浏览器控制台是否有错误</li>
-              </ol>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
-        {testResult && !testResult.success && (
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold text-red-900 dark:text-red-100 mb-4">
-              测试失败
-            </h2>
-            <div className="text-red-800 dark:text-red-200 space-y-2">
-              <p>Token 验证失败</p>
-              <p className="mt-4"><strong>可能原因：</strong></p>
-              <ul className="list-disc list-inside space-y-1 mt-2">
-                <li>Token 已过期</li>
-                <li>Token 格式不正确</li>
-                <li>Token 对应的用户不存在或已被禁用</li>
-              </ul>
-              <p className="mt-4"><strong>解决方案：</strong></p>
-              <ol className="list-decimal list-inside space-y-1 mt-2">
-                <li>访问 <a href="/login" className="underline">登录页面</a> 重新登录</li>
-                <li>检查用户状态是否正常</li>
-              </ol>
-            </div>
-          </div>
+        {/* 完整 Token */}
+        {tokenInfo?.exists && (
+          <Card>
+            <CardHeader>
+              <CardTitle>完整 Token</CardTitle>
+              <CardDescription>
+                当前使用的完整 Token 字符串
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <pre className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs overflow-x-auto break-all">
+                {localStorage.getItem('token')}
+              </pre>
+            </CardContent>
+          </Card>
         )}
-
-        {/* 返回链接 */}
-        <div className="text-center">
-          <a
-            href="/dashboard"
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            返回仪表盘
-          </a>
-        </div>
       </div>
-    </div>
+    </MainLayout>
   );
 }
