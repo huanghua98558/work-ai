@@ -13,19 +13,45 @@ echo "========================================="
 export NODE_ENV=${NODE_ENV:-production}
 export PORT=${PORT:-5000}
 
-# 检查必需的环境变量
-echo "检查环境变量配置..."
+# 🔧 尝试从多个来源加载环境变量
+echo ""
+echo "🔍 尝试加载环境变量..."
+echo ""
 
-# 调试：打印所有可能的环境变量名称
+# 1. 从 .env 文件加载
+if [ -f ".env" ]; then
+  echo "✅ 发现 .env 文件，正在加载..."
+  export $(cat .env | grep -v '^#' | grep -v '^$' | xargs)
+  echo "   已从 .env 文件加载环境变量"
+fi
+
+# 2. 从常见的环境变量文件加载（FaaS 平台可能使用）
+if [ -f "/app/work/env/.env" ]; then
+  echo "✅ 发现 /app/work/env/.env 文件，正在加载..."
+  export $(cat /app/work/env/.env | grep -v '^#' | grep -v '^$' | xargs)
+  echo "   已从 /app/work/env/.env 文件加载环境变量"
+fi
+
+if [ -f "/run/secrets/.env" ]; then
+  echo "✅ 发现 /run/secrets/.env 文件，正在加载..."
+  export $(cat /run/secrets/.env | grep -v '^#' | grep -v '^$' | xargs)
+  echo "   已从 /run/secrets/.env 文件加载环境变量"
+fi
+
+# 3. 检查所有可能的环境变量
 echo ""
 echo "🔍 调试信息：检查所有可能的数据库环境变量..."
 echo "  DATABASE_URL: ${DATABASE_URL:-未设置}"
+echo "  PGDATABASE_URL: ${PGDATABASE_URL:-未设置}"
 echo "  POSTGRES_URL: ${POSTGRES_URL:-未设置}"
 echo "  POSTGRESQL_URL: ${POSTGRESQL_URL:-未设置}"
 echo "  DB_URL: ${DB_URL:-未设置}"
 echo "  PG_URL: ${PG_URL:-未设置}"
 echo "  DATABASE_CONNECTION_URL: ${DATABASE_CONNECTION_URL:-未设置}"
 echo ""
+
+# 检查必需的环境变量
+echo "检查环境变量配置..."
 
 # 尝试自动获取数据库连接信息（支持多种环境变量名称）
 if [ -z "$DATABASE_URL" ]; then
@@ -45,6 +71,9 @@ if [ -z "$DATABASE_URL" ]; then
   elif [ -n "$DATABASE_CONNECTION_URL" ]; then
     export DATABASE_URL="$DATABASE_CONNECTION_URL"
     echo "✅ 从 DATABASE_CONNECTION_URL 获取数据库连接信息"
+  elif [ -n "$PGDATABASE_URL" ]; then
+    export DATABASE_URL="$PGDATABASE_URL"
+    echo "✅ 从 PGDATABASE_URL 获取数据库连接信息"
   fi
 fi
 
