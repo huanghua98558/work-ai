@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 生产环境启动脚本
-# 包含健康检查和优雅启动逻辑
+# 包含环境变量检查、健康检查和优雅启动逻辑
 
 set -e
 
@@ -12,6 +12,44 @@ echo "========================================="
 # 环境变量
 export NODE_ENV=production
 export PORT=5000
+
+# 检查必需的环境变量
+echo "检查环境变量配置..."
+
+REQUIRED_VARS=(
+  "DATABASE_URL"
+  "JWT_SECRET"
+)
+
+MISSING_VARS=()
+
+for var in "${REQUIRED_VARS[@]}"; do
+  if [ -z "${!var}" ]; then
+    MISSING_VARS+=("$var")
+  fi
+done
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+  echo "❌ 环境变量配置错误："
+  echo ""
+  for var in "${MISSING_VARS[@]}"; do
+    echo "  - $var: Required"
+  done
+  echo ""
+  echo "请在部署平台配置以下环境变量："
+  echo ""
+  for var in "${REQUIRED_VARS[@]}"; do
+    echo "  • $var"
+  done
+  echo ""
+  echo "参考配置："
+  echo "  DATABASE_URL=postgresql://user:password@host:5432/database"
+  echo "  JWT_SECRET=your-secret-key-at-least-32-characters-long"
+  echo ""
+  exit 1
+fi
+
+echo "✅ 环境变量检查通过"
 
 # 启动服务
 echo "正在启动服务..."
