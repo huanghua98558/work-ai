@@ -1,286 +1,274 @@
-# 部署说明文档
+# WorkBot 部署说明
 
-## 问题说明
+## 概述
 
-在部署过程中遇到 "timeout exceeded when trying to connect" 错误，主要由以下原因导致：
+本文档描述 WorkBot 企业微信机器人管理系统的部署流程，包括环境配置、构建、启动和验证。
 
-1. **数据库连接超时时间过短**：原来设置为 5 秒，在网络不稳定或数据库响应慢时会超时
-2. **缺少健康检查机制**：部署系统无法确认服务是否真正启动成功
-3. **缺少重试机制**：网络抖动导致连接失败后没有自动重试
+## 前置要求
 
-## 解决方案
+### 1. 环境变量配置
 
-### 1. 优化数据库连接配置
+在项目根目录创建 `.env` 文件，配置以下环境变量：
 
-**文件：** `src/lib/db.ts`
-
-**修改内容：**
-- 将连接超时从 5 秒增加到 15 秒
-- 添加查询超时 30 秒
-- 添加连接重试机制（最多重试 3 次，间隔 1 秒）
-- 添加连接健康检查功能
-
-```javascript
-_pool = new Pool({
-  connectionString,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 15000,  // 从 5 秒增加到 15 秒
-  query_timeout: 30000,             // 新增：查询超时 30 秒
-  retry: {
-    retries: 3,                     // 新增：重试 3 次
-    delay: 1000,                    // 新增：重试间隔 1 秒
-  },
-});
-```
-
-### 2. 添加健康检查端点
-
-**文件：** `src/app/api/health/ready/route.ts`
-
-**功能：**
-- 检查数据库连接是否正常
-- 检查 API 服务是否正常
-- 返回详细的健康状态信息
-
-**使用方式：**
 ```bash
-GET /api/health/ready
+# 数据库连接（阿里云 RDS PostgreSQL）
+PGDATABASE_URL=postgresql://username:password@rds-hostname:5432/dbname?sslmode=disable
+
+# JWT 密钥（生产环境必须配置）
+JWT_SECRET=your-secret-key-here
+
+# 其他配置（可选）
+NODE_ENV=production
 ```
 
-**响应示例：**
-```json
-{
-  "status": "ready",
-  "message": "服务已就绪",
-  "checks": {
-    "database": "ok",
-    "api": "ok"
-  },
-  "timestamp": "2026-02-08T01:49:36.551Z"
-}
-```
+**重要说明**：
+- `PGDATABASE_URL` 中的 `sslmode=disable` 是必需的，因为阿里云 RDS 不支持 SSL 连接
+- `JWT_SECRET` 在生产环境必须配置，否则可能导致安全风险
+- 数据库白名单需要设置为 `0.0.0.0/0` 以允许沙箱环境访问
 
-### 3. 创建部署脚本
+### 2. 依赖安装
 
-#### 部署构建脚本
-**文件：** `scripts/deploy-build.sh`
+确保已安装 Node.js 18+ 和 pnpm：
 
-**功能：**
-- 清理旧的构建文件
-- 安装生产环境依赖
-- 构建 Next.js 应用
-- 验证构建结果
-
-**使用方式：**
 ```bash
-bash scripts/deploy-build.sh
-```
+# 安装 pnpm
+npm install -g pnpm
 
-#### 启动脚本
-**文件：** `scripts/start.sh`
-
-**功能：**
-- 启动服务
-- 等待服务启动（最多 60 秒）
-- 健康检查确认服务就绪
-- 失败时自动清理进程
-
-**使用方式：**
-```bash
-bash scripts/start.sh
-```
-
-#### 数据库连接测试脚本
-**文件：** `scripts/test-db.sh`
-
-**功能：**
-- 测试数据库连接
-- 显示数据库版本信息
-- 验证环境变量配置
-
-**使用方式：**
-```bash
-bash scripts/test-db.sh
-```
-
-### 4. 更新部署配置
-
-**文件：** `.coze`
-
-**修改内容：**
-- 部署时使用 `deploy-build.sh` 构建脚本
-- 部署时使用 `start.sh` 启动脚本
-
-```toml
-[deploy]
-build = ["bash", "scripts/deploy-build.sh"]
-run = ["bash", "scripts/start.sh"]
+# 安装项目依赖
+pnpm install
 ```
 
 ## 部署流程
 
-### 开发环境部署
+### 方法 1：使用部署脚本（推荐）
+
+项目提供了自动化部署脚本，可以简化部署流程：
 
 ```bash
-# 1. 测试数据库连接
-bash scripts/test-db.sh
-
-# 2. 启动开发服务器
-coze dev
+# 1. 构建 + 启动
+./scripts/deploy-build.sh
 ```
 
-### 生产环境部署
+该脚本会自动执行以下操作：
+- 安装依赖
+- 清理构建缓存
+- 构建生产版本
+- 启动服务
+- 验证服务状态
+
+### 方法 2：手动部署
+
+如果需要手动部署，请按照以下步骤：
+
+#### 1. 构建生产版本
 
 ```bash
-# 1. 测试数据库连接
-bash scripts/test-db.sh
+# 构建生产版本
+pnpm run build
+```
 
-# 2. 构建项目
-bash scripts/deploy-build.sh
+构建成功后，`.next` 目录下会生成优化后的生产文件。
 
-# 3. 启动服务
-bash scripts/start.sh
+#### 2. 启动服务
 
-# 4. 验证服务健康状态
+```bash
+# 使用提供的启动脚本
+./scripts/start.sh
+
+# 或直接启动
+NODE_ENV=production pnpm run start
+```
+
+服务启动后会运行在 5000 端口。
+
+#### 3. 验证服务状态
+
+```bash
+# 检查端口是否监听
+ss -lptn 'sport = :5000'
+
+# 或使用健康检查端点
 curl http://localhost:5000/api/health/ready
 ```
 
-### 自动化部署
+健康检查端点返回示例：
 
-部署系统会自动执行以下步骤：
-
-1. 执行 `scripts/deploy-build.sh`
-2. 执行 `scripts/start.sh`
-3. 启动脚本会等待服务就绪（最多 60 秒）
-4. 通过 `/api/health/ready` 确认服务健康状态
-5. 如果超时，自动清理进程并返回错误
-
-## 监控和维护
-
-### 检查服务状态
-
-```bash
-# 基本健康检查
-curl http://localhost:5000/api/health
-
-# 启动就绪检查
-curl http://localhost:5000/api/health/ready
-
-# 系统全面检查
-curl http://localhost:5000/api/system/check
+```json
+{
+  "status": "ready",
+  "database": "connected",
+  "timestamp": "2024-02-08T10:00:00.000Z"
+}
 ```
 
-### 查看日志
+## 数据库连接测试
+
+在部署前，建议先测试数据库连接：
 
 ```bash
-# 查看主日志
-tail -f /app/work/logs/bypass/app.log
-
-# 查看开发日志
-tail -f /app/work/logs/bypass/dev.log
+# 使用提供的测试脚本
+./scripts/test-db.sh
 ```
 
-### 数据库维护
+该脚本会测试数据库连接是否正常，并返回详细的连接信息。
 
-```bash
-# 测试数据库连接
-bash scripts/test-db.sh
+## 服务端口
 
-# 迁移数据库
-pnpm run db:push
+- **HTTP 服务**: 5000
+- **WebSocket 服务**: 与 HTTP 共享 5000 端口
 
-# 打开数据库管理界面
-pnpm run db:studio
-```
+## 日志位置
+
+- **应用日志**: `/app/work/logs/bypass/app.log`
+- **开发日志**: `/app/work/logs/bypass/dev.log`
+- **控制台日志**: `/app/work/logs/bypass/console.log`
 
 ## 常见问题
 
-### Q1: 部署时仍然超时怎么办？
+### 1. 数据库连接超时
 
-**A:**
-1. 检查数据库是否可访问
-   ```bash
-   bash scripts/test-db.sh
-   ```
+**问题**: 部署时出现 "timeout exceeded when trying to connect" 错误。
 
-2. 检查网络连接
-   ```bash
-   ping pgm-bp128vs75fs0mg175o.pg.rds.aliyuncs.com
-   ```
+**解决方案**:
+- 数据库连接超时已优化为 15 秒，添加了连接重试机制（最多 3 次）
+- 确保数据库白名单设置为 `0.0.0.0/0`
+- 确保数据库连接字符串包含 `sslmode=disable`
 
-3. 检查数据库白名单配置
-   - 确保部署服务器 IP 已添加到数据库白名单
-   - 当前配置为 `0.0.0.0/0`（允许所有IP）
+### 2. 构建失败
 
-4. 检查防火墙规则
-   ```bash
-   # 检查端口 5432 是否开放
-   nc -zv pgm-bp128vs75fs0mg175o.pg.rds.aliyuncs.com 5432
-   ```
+**问题**: 构建时出现 TypeScript 错误。
 
-### Q2: 服务启动后健康检查失败？
+**解决方案**:
+- 生产环境会进行严格的类型检查
+- 确保所有依赖都已安装：`pnpm install`
+- 检查 `.env` 文件是否配置正确
 
-**A:**
-1. 查看服务日志
-   ```bash
-   tail -f /app/work/logs/bypass/app.log
-   ```
+### 3. 客户端异常
 
-2. 手动检查数据库连接
-   ```bash
-   bash scripts/test-db.sh
-   ```
+**问题**: 页面显示 "Application error: a client-side exception has occurred"。
 
-3. 检查环境变量配置
-   ```bash
-   cat .env | grep DATABASE
-   ```
+**解决方案**:
+- 系统已实现全局错误边界和错误监听器
+- 错误会自动上报到 `/api/errors` 端点
+- 检查日志文件查看详细错误信息
 
-### Q3: 如何增加超时时间？
+### 4. 端口冲突
 
-**A:**
-修改 `src/lib/db.ts` 中的连接超时配置：
+**问题**: 启动时提示 "Port 5000 is already in use"。
 
-```javascript
-_pool = new Pool({
-  connectionString,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 30000,  // 增加到 30 秒
-  query_timeout: 60000,             // 增加到 60 秒
-  retry: {
-    retries: 5,                     // 增加重试次数
-    delay: 2000,                    // 增加重试间隔
-  },
-});
+**解决方案**:
+
+```bash
+# 查找占用端口的进程
+ss -lptn 'sport = :5000'
+
+# 终止进程
+kill -9 <PID>
+
+# 重新启动服务
+./scripts/start.sh
 ```
 
-## 性能优化建议
+### 5. 服务未就绪
 
-1. **连接池大小**：根据服务器资源调整 `max` 参数（当前 20）
-2. **超时时间**：根据网络情况调整 `connectionTimeoutMillis`
-3. **重试策略**：根据业务需求调整重试次数和间隔
-4. **监控告警**：配置数据库连接失败告警
+**问题**: 部署系统无法确认服务是否启动成功。
 
-## 安全建议
+**解决方案**:
+- 使用健康检查端点：`curl http://localhost:5000/api/health/ready`
+- 确保返回 `status: "ready"` 和 `database: "connected"`
+- 如果健康检查失败，检查日志文件排查问题
 
-1. **环境变量**：确保 `.env` 文件不提交到版本控制
-2. **数据库密码**：使用强密码并定期更换
-3. **网络配置**：生产环境应使用 SSL 连接（`sslmode=require`）
-4. **访问控制**：限制数据库白名单，只允许必要的IP访问
+## 部署验证清单
 
-## 总结
+在部署完成后，请验证以下项目：
 
-通过以上优化，部署超时问题已得到解决：
+- [ ] 服务启动成功，5000 端口正常监听
+- [ ] 健康检查端点返回正常状态
+- [ ] 数据库连接正常
+- [ ] 可以访问首页：`http://localhost:5000`
+- [ ] 登录页面可以正常加载
+- [ ] 日志文件正常生成
 
-✅ 数据库连接超时增加到 15 秒
-✅ 添加了连接重试机制（最多 3 次）
-✅ 添加了健康检查端点
-✅ 创建了完整的部署脚本
-✅ 实现了优雅启动和关闭
+## 生产环境安全配置
 
-如果仍然遇到问题，请：
-1. 查看日志获取详细错误信息
-2. 检查网络和数据库连接
-3. 根据实际情况调整超时和重试参数
+在生产环境部署时，请确保：
+
+1. **JWT_SECRET**: 必须配置强密码
+2. **数据库白名单**: 使用最小权限原则，只允许必要的 IP 访问
+3. **HTTPS**: 使用反向代理（如 Nginx）配置 HTTPS
+4. **防火墙**: 配置防火墙规则，只允许必要端口访问
+
+## 监控和维护
+
+### 日志监控
+
+定期检查日志文件：
+
+```bash
+# 查看最新日志
+tail -n 50 /app/work/logs/bypass/app.log
+
+# 搜索错误日志
+grep -i error /app/work/logs/bypass/app.log | tail -n 20
+```
+
+### 数据库监控
+
+使用提供的测试脚本定期检查数据库连接：
+
+```bash
+./scripts/test-db.sh
+```
+
+### 服务重启
+
+如果需要重启服务：
+
+```bash
+# 停止服务
+pkill -f "tsx server.ts"
+
+# 启动服务
+./scripts/start.sh
+```
+
+## 技术支持
+
+如果遇到部署问题，请检查：
+
+1. 日志文件：`/app/work/logs/bypass/app.log`
+2. 健康检查：`curl http://localhost:5000/api/health/ready`
+3. 数据库连接：`./scripts/test-db.sh`
+
+如需进一步帮助，请提供：
+- 错误日志
+- 健康检查结果
+- 数据库连接测试结果
+
+## 附录
+
+### 环境变量完整列表
+
+```bash
+# 数据库连接
+PGDATABASE_URL=postgresql://username:password@host:5432/dbname?sslmode=disable
+DATABASE_URL=postgresql://username:password@host:5432/dbname?sslmode=disable
+
+# JWT 配置
+JWT_SECRET=your-secret-key
+
+# 运行环境
+NODE_ENV=production
+```
+
+### 服务脚本说明
+
+- `scripts/deploy-build.sh`: 自动化部署脚本（构建 + 启动）
+- `scripts/start.sh`: 服务启动脚本
+- `scripts/test-db.sh`: 数据库连接测试脚本
+
+### 关键端点
+
+- 健康检查: `GET /api/health/ready`
+- 错误上报: `POST /api/errors`
+- 登录: `POST /api/user/login-by-password`
