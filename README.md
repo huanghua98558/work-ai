@@ -4,51 +4,87 @@
 
 WorkBot 是一个完整的企业微信机器人管理系统，支持多平台（企业微信、微信公众号、微信小程序）接入，提供激活码管理、机器人配置、对话管理、知识库等功能。
 
+## ⚠️ 重要提示
+
+**部署前必须配置以下必需的环境变量：**
+
+```bash
+DATABASE_URL=postgresql://用户名:密码@数据库地址:5432/数据库名
+JWT_SECRET=至少32个字符的随机字符串
+```
+
+**详细部署指南请查看：** [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md)
+
+## 文档导航
+
+- [快速开始指南](./docs/QUICKSTART.md) - 5 分钟快速部署
+- [部署指南](./docs/DEPLOYMENT_GUIDE.md) - 详细的部署步骤
+- [环境变量说明](./docs/ENVIRONMENT_VARIABLES.md) - 所有环境变量配置
+- [故障排查指南](./docs/TROUBLESHOOTING.md) - 常见问题解决方案
+
 ## 技术栈
 
 - **前端**：Next.js 15.5.12 (App Router) + React 19 + TypeScript 5
 - **UI 组件**：shadcn/ui (基于 Radix UI)
 - **样式**：Tailwind CSS 3.4
 - **后端**：Next.js API Routes
-- **数据库**：PostgreSQL 18 (阿里云 RDS)
+- **数据库**：PostgreSQL 18 (支持阿里云 RDS、Supabase 等)
 - **ORM**：Drizzle ORM 0.45.1
 - **认证**：JWT (jsonwebtoken)
 - **实时通信**：WebSocket (ws 库)
 
 ## 快速开始
 
-### 1. 环境准备
+### 前置要求
 
-确保已安装：
-- Node.js 24
+- Node.js 24+
 - pnpm
+- PostgreSQL 数据库
 
-### 2. 安装依赖
+### 本地开发
+
+#### 1. 安装依赖
 
 ```bash
 pnpm install
 ```
 
-### 3. 配置环境变量
+#### 2. 配置环境变量
 
-复制 `.env.example` 为 `.env`：
-
-```env
-# 数据库连接
-PGDATABASE_URL=postgresql://username:password@host:port/database
-
-# JWT 密钥
-JWT_SECRET=your-secret-key-change-in-production
-```
-
-### 4. 初始化数据库
+创建 `.env` 文件：
 
 ```bash
-# 创建数据库表
-curl -X POST http://localhost:5000/api/db/create-aliyun-tables
+cp .env.example .env
 ```
 
-### 5. 启动开发服务器
+编辑 `.env`：
+
+```env
+DATABASE_URL=postgresql://workbot_user:password@localhost:5432/workbot
+JWT_SECRET=your-jwt-secret-here
+NODE_ENV=development
+```
+
+**重要**：
+- `DATABASE_URL` 必须是有效的 PostgreSQL 连接字符串
+- `JWT_SECRET` 至少 32 个字符，使用以下命令生成：
+  ```bash
+  openssl rand -base64 32
+  ```
+
+#### 3. 创建数据库
+
+```sql
+CREATE DATABASE workbot;
+```
+
+#### 4. 初始化数据库表
+
+```bash
+curl -X POST http://localhost:5000/api/db/create-tables
+```
+
+#### 5. 启动开发服务器
 
 ```bash
 pnpm dev
@@ -56,13 +92,24 @@ pnpm dev
 
 访问 http://localhost:5000
 
-### 6. 初始化管理员账户
+### 生产部署
 
-首次访问 http://localhost:5000/init，按照提示创建管理员账户。
+详细的部署指南请参考以下文档：
 
-默认管理员账号：
-- 账号：`admin`
-- 密码：`admin123`
+- **快速开始**：[docs/QUICKSTART.md](./docs/QUICKSTART.md) - 5 分钟快速部署到 Vercel/Railway/Render
+- **详细部署**：[docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) - 完整的部署步骤
+- **环境变量**：[docs/ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md) - 所有配置选项
+
+#### 部署前必读
+
+⚠️ **部署前必须配置以下必需的环境变量**：
+
+```bash
+DATABASE_URL=postgresql://用户名:密码@数据库地址:5432/数据库名
+JWT_SECRET=至少32个字符的随机字符串
+```
+
+如果未配置这些环境变量，应用将无法启动。
 
 ## 功能特性
 
@@ -120,16 +167,112 @@ pnpm dev
 
 ## 部署
 
-详细的部署指南请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+### 推荐平台
 
-### 快速部署
+- **Vercel** - 最简单的部署方式，支持自动部署和预览环境
+- **Railway** - 一站式平台，自动配置数据库
+- **Render** - 免费额度，简单易用
+- **阿里云** - 国内访问速度快
+
+### 快速部署指南
+
+#### 部署到 Vercel（推荐新手）
+
+1. 连接 GitHub 仓库到 Vercel
+2. 配置环境变量：
+   - `DATABASE_URL` - PostgreSQL 连接字符串
+   - `JWT_SECRET` - 至少 32 个字符的随机字符串
+3. 点击 Deploy
+4. 部署完成后访问 `/api/db/create-tables` 创建数据库表
+
+详细步骤请查看：[docs/QUICKSTART.md](./docs/QUICKSTART.md#步骤-3-部署到-vercel)
+
+#### 部署到 Railway
+
+1. 创建新项目并连接 GitHub 仓库
+2. 添加 PostgreSQL 数据库服务
+3. 配置环境变量：
+   - `JWT_SECRET` - 至少 32 个字符的随机字符串
+   - `DATABASE_URL` - 会自动从数据库服务添加
+4. 等待部署完成
+5. 访问 `/api/db/create-tables` 创建数据库表
+
+详细步骤请查看：[docs/QUICKSTART.md](./docs/QUICKSTART.md#步骤-4-部署到-railway)
+
+### Docker 部署
 
 ```bash
-# 构建项目
-pnpm build
+# 构建镜像
+docker build -t workbot .
 
-# 启动生产环境
-pnpm start
+# 运行容器
+docker run -d \
+  -p 5000:5000 \
+  -e DATABASE_URL="postgresql://user:password@host:5432/workbot" \
+  -e JWT_SECRET="your-secret-key" \
+  --name workbot \
+  workbot
+```
+
+## 常见问题
+
+### 部署相关
+
+#### Q: 部署时提示 "环境变量配置错误"
+
+**A:** 确保在部署平台配置了以下必需的环境变量：
+- `DATABASE_URL` - PostgreSQL 连接字符串
+- `JWT_SECRET` - 至少 32 个字符的随机字符串
+
+详细解决方案请查看：[docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
+
+#### Q: 如何生成 JWT_SECRET？
+
+**A:** 使用以下命令生成：
+```bash
+openssl rand -base64 32
+```
+
+#### Q: 数据库连接失败
+
+**A:** 检查以下几点：
+- `DATABASE_URL` 格式是否正确
+- 数据库地址可以从部署环境访问
+- 数据库防火墙规则允许连接
+- 数据库已创建
+
+详细解决方案请查看：[docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
+
+### 功能相关
+
+#### Q: 如何创建数据库表？
+
+**A:** 部署完成后，访问以下 URL：
+```
+https://your-domain.com/api/db/create-tables
+```
+
+#### Q: 如何创建管理员账户？
+
+**A:** 首次访问应用时，系统会自动引导创建管理员账户。
+
+#### Q: 忘记管理员密码怎么办？
+
+**A:** 目前需要直接在数据库中修改密码，或者重新部署应用并重新初始化。
+
+## 健康检查
+
+应用提供了健康检查接口：
+
+```bash
+# 基本健康检查
+curl https://your-domain.com/api/health
+
+# 就绪检查（检查数据库连接）
+curl https://your-domain.com/api/health/ready
+
+# 数据库检查
+curl https://your-domain.com/api/db/check
 ```
 
 ## API 文档
@@ -186,6 +329,34 @@ Content-Type: application/json
 DELETE /api/activation-codes/{id}
 Authorization: Bearer {token}
 ```
+
+## 开发
+
+### 运行测试
+
+```bash
+pnpm test
+```
+
+### 构建检查
+
+```bash
+pnpm build
+```
+
+### 代码检查
+
+```bash
+pnpm lint
+```
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 许可证
+
+MIT License
 
 ### 机器人管理
 
