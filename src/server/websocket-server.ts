@@ -147,7 +147,7 @@ export async function initializeWebSocketServer(server: any) {
                     connectedAt: Date.now(),
                   };
 
-                  connections.set(robotId, connection);
+                  connections.set(authResult.robotId, connection);
 
                   // 保存到全局变量
                   if (typeof global !== 'undefined') {

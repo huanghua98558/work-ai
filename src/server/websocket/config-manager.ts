@@ -220,7 +220,7 @@ export class ConfigManager {
 
         console.log(`[ConfigManager] 配置已删除: ${robotId} - ${configType}`);
 
-        return result.rowCount > 0;
+        return (result.rowCount ?? 0) > 0;
       } finally {
         client.release();
       }

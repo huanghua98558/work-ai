@@ -3,7 +3,7 @@
  * 基于 WorkBot WebSocket 通讯技术文档 v3.0
  */
 
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { IncomingMessage } from 'http';
 import { getPool } from '@/lib/db';
 import { connectionManager } from './websocket/connection-manager';
@@ -48,7 +48,7 @@ export async function initializeWebSocketServer(server: any) {
     console.log('[WebSocket v3.0] 数据库连接池已初始化');
 
     // 创建 WebSocket 服务器
-    const wss = new WebSocket.Server({ noServer: true });
+    const wss = new WebSocketServer({ noServer: true });
 
     // 保存到全局变量
     if (typeof global !== 'undefined') {
@@ -435,7 +435,6 @@ export function getConnectionInfo(robotId: string): any {
     robotId: connection.robotId,
     userId: connection.userId,
     deviceId: connection.deviceId,
-    connectedAt: connection.connectedAt,
     lastHeartbeatAt: connection.lastHeartbeatAt,
   };
 }
