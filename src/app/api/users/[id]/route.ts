@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { requireAuth, isAdmin } from "@/lib/auth";
+import { users } from "@/storage/database/shared/schema";
 import { z } from "zod";
 
 const updateUserSchema = z.object({
@@ -92,46 +93,39 @@ export async function PUT(
 
     const db = await getDatabase();
 
-    // 构建 SET 子句
-    const setClauses = [];
-    const values = [];
+    // 构建更新数据对象
+    const updateData: Record<string, any> = {};
 
     if (validatedData.nickname !== undefined) {
-      setClauses.push(`nickname = $${values.length + 1}`);
-      values.push(validatedData.nickname);
+      updateData.nickname = validatedData.nickname;
     }
     if (validatedData.avatar !== undefined) {
-      setClauses.push(`avatar = $${values.length + 1}`);
-      values.push(validatedData.avatar);
+      updateData.avatar = validatedData.avatar;
     }
     if (validatedData.role !== undefined) {
-      setClauses.push(`role = $${values.length + 1}`);
-      values.push(validatedData.role);
+      updateData.role = validatedData.role;
     }
     if (validatedData.status !== undefined) {
-      setClauses.push(`status = $${values.length + 1}`);
-      values.push(validatedData.status);
+      updateData.status = validatedData.status;
     }
 
-    if (setClauses.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { success: false, error: "没有提供更新字段" },
         { status: 400 }
       );
     }
 
-    setClauses.push(`updated_at = NOW()`);
+    updateData.updatedAt = new Date();
 
-    const updateQuery = sql`
-      UPDATE users 
-      SET ${sql.raw(setClauses.join(", "))}
-      WHERE id = ${userId}
-      RETURNING *
-    `;
+    // 使用Drizzle的update方法
+    const updatedUserResult = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
 
-    const updatedUserResult = await db.execute(updateQuery);
-
-    if (updatedUserResult.rows.length === 0) {
+    if (updatedUserResult.length === 0) {
       return NextResponse.json(
         { success: false, error: "用户不存在" },
         { status: 404 }
@@ -140,7 +134,7 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: updatedUserResult.rows[0],
+      data: updatedUserResult[0],
     });
   } catch (error: any) {
     console.error("更新用户错误:", error);

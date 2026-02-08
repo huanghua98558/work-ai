@@ -22,11 +22,10 @@ import {
   XCircle,
   Crown,
   User as UserIcon,
-  Mail,
   Phone,
-  MoreVertical,
-  Loader2,
   RefreshCw,
+  Eye,
+  MoreVertical,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -36,7 +35,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +55,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -81,12 +81,18 @@ export default function UsersPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // 用户详情对话框状态
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailUser, setDetailUser] = useState<User | null>(null);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/users', {
         params: {
           search: searchQuery || undefined,
+          role: roleFilter !== 'all' ? roleFilter : undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
           page,
           limit: 20,
         },
@@ -116,7 +122,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers();
-  }, [page]);
+  }, [page, roleFilter, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -209,7 +215,7 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = async (userId: number, userName: string) => {
-    if (!confirm(`确定要删除用户 "${userName}" 吗？`)) {
+    if (!confirm(`确定要删除用户 "${userName}" 吗？此操作将禁用该用户账号。`)) {
       return;
     }
 
@@ -239,6 +245,42 @@ export default function UsersPage() {
     }
   };
 
+  const handleToggleStatus = async (user: User) => {
+    const newStatus = user.status === 'active' ? 'disabled' : 'active';
+    const action = newStatus === 'active' ? '启用' : '禁用';
+
+    if (!confirm(`确定要${action}用户 "${user.nickname}" 吗？`)) {
+      return;
+    }
+
+    try {
+      const response = await apiClient.put(`/api/users/${user.id}`, {
+        status: newStatus,
+      });
+
+      if (response.success) {
+        toast({
+          title: `${action}成功`,
+          description: `用户已${action}`,
+        });
+        loadUsers();
+      } else {
+        toast({
+          title: `${action}失败`,
+          description: response.error || `${action}用户失败`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error(`${action}用户失败:`, error);
+      toast({
+        title: `${action}失败`,
+        description: error.message || `${action}用户失败`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setEditUserForm({
@@ -249,7 +291,12 @@ export default function UsersPage() {
     setEditDialogOpen(true);
   };
 
-  if (loading) {
+  const openDetailDialog = (user: User) => {
+    setDetailUser(user);
+    setDetailDialogOpen(true);
+  };
+
+  if (loading && page === 1) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -265,9 +312,12 @@ export default function UsersPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        {/* 页面标题 */}
+        {/* 页面标题 - 使用渐变背景 */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-600 via-pink-600 to-red-600 dark:from-rose-900 dark:via-pink-900 dark:to-red-900 p-8">
           <div className="relative">
+            <div className="inline-block px-4 py-2 mb-4 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+              <span className="text-white/90 text-sm font-medium">管理系统用户，支持角色权限配置和账户状态管理</span>
+            </div>
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
               用户管理
             </h1>
@@ -291,7 +341,7 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {/* 统计卡片 */}
+        {/* 统计卡片 - 使用渐变背景 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="bg-gradient-to-br from-rose-500 to-rose-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -344,22 +394,41 @@ export default function UsersPage() {
           </Card>
         </div>
 
-        {/* 搜索栏 */}
-        <Card>
+        {/* 搜索和筛选栏 */}
+        <Card className="border-2 border-rose-100 dark:border-rose-900">
           <CardContent className="p-4">
-            <div className="flex gap-4">
-              <div className="flex-1 relative">
+            <div className="flex gap-4 flex-wrap">
+              <div className="flex-1 min-w-[200px] relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="搜索用户名或邮箱..."
+                  placeholder="搜索用户名或手机号..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" />
-                筛选
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="角色筛选" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部角色</SelectItem>
+                  <SelectItem value="admin">管理员</SelectItem>
+                  <SelectItem value="user">普通用户</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="状态筛选" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="active">正常</SelectItem>
+                  <SelectItem value="disabled">已禁用</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={loadUsers}>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </CardContent>
@@ -384,7 +453,7 @@ export default function UsersPage() {
                     <TableHead>状态</TableHead>
                     <TableHead>注册时间</TableHead>
                     <TableHead>最后登录</TableHead>
-                    <TableHead>操作</TableHead>
+                    <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -392,7 +461,7 @@ export default function UsersPage() {
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8">
                         <div className="flex items-center justify-center">
-                          <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+                          <RefreshCw className="w-6 h-6 animate-spin text-gray-500" />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -433,7 +502,12 @@ export default function UsersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.status === 'active' ? 'default' : 'outline'}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={user.status === 'active' ? 'text-green-600' : 'text-red-600'}
+                            onClick={() => handleToggleStatus(user)}
+                          >
                             {user.status === 'active' ? (
                               <span className="flex items-center gap-1">
                                 <CheckCircle className="h-3 w-3" />
@@ -445,7 +519,7 @@ export default function UsersPage() {
                                 已禁用
                               </span>
                             )}
-                          </Badge>
+                          </Button>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
@@ -463,7 +537,15 @@ export default function UsersPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-600"
+                              onClick={() => openDetailDialog(user)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -487,6 +569,31 @@ export default function UsersPage() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* 分页 */}
+            <div className="flex justify-between items-center pt-4">
+              <div className="text-sm text-gray-500">
+                共 {total} 条记录 · 第 {page} 页
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  上一页
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={users.length < 20}
+                >
+                  下一页
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -553,13 +660,30 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">
+                  状态
+                </Label>
+                <Select
+                  value={createUserForm.status}
+                  onValueChange={(value) => setCreateUserForm({ ...createUserForm, status: value as 'active' | 'disabled' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">正常</SelectItem>
+                    <SelectItem value="disabled">禁用</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
                 取消
               </Button>
               <Button onClick={handleCreateUser} disabled={creating}>
-                {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {creating ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
                 创建
               </Button>
             </DialogFooter>
@@ -625,10 +749,74 @@ export default function UsersPage() {
                 取消
               </Button>
               <Button onClick={handleEditUser} disabled={saving}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
                 保存
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 用户详情对话框 */}
+        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>用户详情</DialogTitle>
+              <DialogDescription>查看用户详细信息</DialogDescription>
+            </DialogHeader>
+            {detailUser && (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-gray-500">昵称</Label>
+                  <div className="col-span-3 font-medium">{detailUser.nickname}</div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-gray-500">手机号</Label>
+                  <div className="col-span-3 font-medium flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    {detailUser.phone}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-gray-500">角色</Label>
+                  <div className="col-span-3">
+                    <Badge variant={detailUser.role === 'admin' ? 'default' : 'outline'}>
+                      {detailUser.role === 'admin' ? (
+                        <span className="flex items-center gap-1">
+                          <Crown className="h-3 w-3" />
+                          管理员
+                        </span>
+                      ) : (
+                        '用户'
+                      )}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-gray-500">状态</Label>
+                  <div className="col-span-3">
+                    <Badge variant={detailUser.status === 'active' ? 'default' : 'secondary'}>
+                      {detailUser.status === 'active' ? '正常' : '已禁用'}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-gray-500">注册时间</Label>
+                  <div className="col-span-3 text-sm">
+                    {new Date(detailUser.created_at).toLocaleString('zh-CN')}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right text-gray-500">最后登录</Label>
+                  <div className="col-span-3 text-sm">
+                    {detailUser.last_login_at ? (
+                      new Date(detailUser.last_login_at).toLocaleString('zh-CN')
+                    ) : (
+                      <span className="text-gray-400">从未登录</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
