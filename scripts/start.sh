@@ -16,6 +16,17 @@ export PORT=${PORT:-5000}
 # 检查必需的环境变量
 echo "检查环境变量配置..."
 
+# 调试：打印所有可能的环境变量名称
+echo ""
+echo "🔍 调试信息：检查所有可能的数据库环境变量..."
+echo "  DATABASE_URL: ${DATABASE_URL:-未设置}"
+echo "  POSTGRES_URL: ${POSTGRES_URL:-未设置}"
+echo "  POSTGRESQL_URL: ${POSTGRESQL_URL:-未设置}"
+echo "  DB_URL: ${DB_URL:-未设置}"
+echo "  PG_URL: ${PG_URL:-未设置}"
+echo "  DATABASE_CONNECTION_URL: ${DATABASE_CONNECTION_URL:-未设置}"
+echo ""
+
 # 尝试自动获取数据库连接信息（支持多种环境变量名称）
 if [ -z "$DATABASE_URL" ]; then
   # 尝试常见的数据库环境变量名称
@@ -28,6 +39,12 @@ if [ -z "$DATABASE_URL" ]; then
   elif [ -n "$DB_URL" ]; then
     export DATABASE_URL="$DB_URL"
     echo "✅ 从 DB_URL 获取数据库连接信息"
+  elif [ -n "$PG_URL" ]; then
+    export DATABASE_URL="$PG_URL"
+    echo "✅ 从 PG_URL 获取数据库连接信息"
+  elif [ -n "$DATABASE_CONNECTION_URL" ]; then
+    export DATABASE_URL="$DATABASE_CONNECTION_URL"
+    echo "✅ 从 DATABASE_CONNECTION_URL 获取数据库连接信息"
   fi
 fi
 
