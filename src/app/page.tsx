@@ -28,6 +28,11 @@ export default function Home() {
               <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 py-6 bg-transparent text-white border-white/50 hover:bg-white/10">
                 了解更多
               </Button>
+              <a href="/admin">
+                <Button size="lg" variant="ghost" className="w-full sm:w-auto text-lg px-8 py-6 bg-transparent text-white/80 hover:bg-white/20">
+                  管理后台
+                </Button>
+              </a>
             </div>
           </div>
         </div>
