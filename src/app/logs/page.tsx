@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -25,6 +25,10 @@ import {
   Trash2,
   Download,
   Radio,
+  BarChart3,
+  Database,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 
 // 日志级别
@@ -190,9 +194,146 @@ export default function LogsPage() {
     navigator.clipboard.writeText(text);
   };
 
+  // 日志统计
+  const logStats = useMemo(() => {
+    const stats = {
+      total: logs.length,
+      verbose: 0,
+      debug: 0,
+      info: 0,
+      warn: 0,
+      error: 0,
+      fatal: 0,
+      uniqueRobots: new Set<string>(),
+      uniqueTags: new Set<string>(),
+    };
+
+    logs.forEach(log => {
+      switch (log.level) {
+        case LogLevel.VERBOSE:
+          stats.verbose++;
+          break;
+        case LogLevel.DEBUG:
+          stats.debug++;
+          break;
+        case LogLevel.INFO:
+          stats.info++;
+          break;
+        case LogLevel.WARN:
+          stats.warn++;
+          break;
+        case LogLevel.ERROR:
+          stats.error++;
+          break;
+        case LogLevel.FATAL:
+          stats.fatal++;
+          break;
+      }
+      if (log.robotId) stats.uniqueRobots.add(log.robotId);
+      if (log.tag) stats.uniqueTags.add(log.tag);
+    });
+
+    return {
+      ...stats,
+      uniqueRobots: stats.uniqueRobots.size,
+      uniqueTags: stats.uniqueTags.size,
+      criticalCount: stats.error + stats.fatal,
+    };
+  }, [logs]);
+
+  // 导出日志
+  const handleExport = () => {
+    const csvContent = [
+      'Timestamp,Level,Tag,RobotID,Message,Extra',
+      ...logs.map(log =>
+        `"${formatTimestamp(log.timestamp)}",${getLevelInfo(log.level).label},"${log.tag}","${log.robotId}","${log.message.replace(/"/g, '""')}","${JSON.stringify(log.extra || {}).replace(/"/g, '""')}"`
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `logs_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">总日志数</p>
+                  <p className="text-2xl font-bold">{total}</p>
+                </div>
+                <Database className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">严重错误</p>
+                  <p className="text-2xl font-bold">{logStats.criticalCount}</p>
+                </div>
+                <Zap className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">警告</p>
+                  <p className="text-2xl font-bold">{logStats.warn}</p>
+                </div>
+                <AlertTriangle className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">正常</p>
+                  <p className="text-2xl font-bold">{logStats.info}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">机器人</p>
+                  <p className="text-2xl font-bold">{logStats.uniqueRobots}</p>
+                </div>
+                <Radio className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">标签</p>
+                  <p className="text-2xl font-bold">{logStats.uniqueTags}</p>
+                </div>
+                <BarChart3 className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">日志管理</h1>
@@ -227,12 +368,12 @@ export default function LogsPage() {
 
               <div className="space-y-2">
                 <Label>日志级别</Label>
-                <Select value={level} onValueChange={setLevel}>
+                <Select value={level || 'all'} onValueChange={(val) => setLevel(val === 'all' ? '' : val)}>
                   <SelectTrigger>
                     <SelectValue placeholder="选择日志级别" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部级别</SelectItem>
+                    <SelectItem value="all">全部级别</SelectItem>
                     <SelectItem value="0">VERBOSE</SelectItem>
                     <SelectItem value="1">DEBUG</SelectItem>
                     <SelectItem value="2">INFO</SelectItem>
@@ -291,6 +432,10 @@ export default function LogsPage() {
               <Button onClick={handleRefresh} variant="outline" className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4" />
                 刷新
+              </Button>
+              <Button onClick={handleExport} variant="outline" className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                导出
               </Button>
             </div>
           </CardContent>
