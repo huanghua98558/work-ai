@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
     const allUsers = await db
       .select({
         id: users.id,
-        username: users.username,
         nickname: users.nickname,
         phone: users.phone,
         role: users.role,
@@ -31,13 +30,12 @@ export async function GET(request: NextRequest) {
     const admins = await db
       .select({
         id: users.id,
-        username: users.username,
         nickname: users.nickname,
         phone: users.phone,
         role: users.role,
         status: users.status,
         createdAt: users.createdAt,
-        passwordHash: users.password_hash,
+        passwordHash: users.passwordHash,
       })
       .from(users)
       .where(sql`LOWER(${users.role}) = LOWER('admin')`)
@@ -58,13 +56,12 @@ export async function GET(request: NextRequest) {
       const exactAdmins = await db
         .select({
           id: users.id,
-          username: users.username,
           nickname: users.nickname,
           phone: users.phone,
           role: users.role,
           status: users.status,
           createdAt: users.createdAt,
-          passwordHash: users.password_hash,
+          passwordHash: users.passwordHash,
         })
         .from(users)
         .where(eq(users.role, 'admin'))
