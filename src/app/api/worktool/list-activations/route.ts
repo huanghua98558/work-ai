@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 
 /**
- * 列出所有已激活的机器人
+ * 列出设备激活记录
  */
 export async function GET(request: NextRequest) {
   try {
@@ -10,16 +10,17 @@ export async function GET(request: NextRequest) {
     const client = await poolInstance.connect();
 
     try {
-      // 从 device_activations 表获取已激活的机器人
       const result = await client.query(
         `SELECT
           id,
           robot_id,
           robot_uuid,
+          activation_code_id,
           device_id,
           status,
           activated_at,
-          last_active_at
+          last_active_at,
+          expires_at
         FROM device_activations
         ORDER BY id
         LIMIT 10`
@@ -30,14 +31,14 @@ export async function GET(request: NextRequest) {
         message: '查询成功',
         data: {
           count: result.rows.length,
-          robots: result.rows,
+          activations: result.rows,
         },
       });
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error('[WorkTool List Robots] 查询失败:', error);
+    console.error('[WorkTool List Activations] 查询失败:', error);
     return NextResponse.json(
       {
         code: 500,

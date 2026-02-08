@@ -69,34 +69,40 @@ export async function POST(request: NextRequest) {
  * 处理消息回调
  */
 async function handleMessageCallback(robotId: string, body: MessageCallbackRequest) {
-  console.log(`[WorkTool Callback] 收到消息回调: bot_id=${robotId}, messageId=${body.messageId}`);
+  console.log(`[WorkTool Callback] 收到消息回调: robot_id=${robotId}, messageId=${body.messageId}`);
 
   const poolInstance = await getPool();
   const client = await poolInstance.connect();
 
   try {
-    // 查询机器人配置（使用实际的字段名）
-    const robotResult = await client.query(
-      `SELECT id, name, bot_secret
-      FROM robots
-      WHERE bot_id = $1`,
+    // 查询设备激活记录（使用 robot_id）
+    const activationResult = await client.query(
+      `SELECT
+        id,
+        robot_id,
+        robot_uuid,
+        device_id,
+        status,
+        activated_at
+      FROM device_activations
+      WHERE robot_id = $1`,
       [robotId]
     );
 
-    if (robotResult.rows.length === 0) {
-      console.warn(`[WorkTool Callback] 机器人不存在: ${robotId}`);
+    if (activationResult.rows.length === 0) {
+      console.warn(`[WorkTool Callback] 机器人未激活: ${robotId}`);
       return NextResponse.json(
         {
           code: 404,
-          message: '机器人不存在',
+          message: '机器人未激活',
         },
         { status: 404 }
       );
     }
 
-    const robot = robotResult.rows[0];
+    const activation = activationResult.rows[0];
 
-    console.log(`[WorkTool Callback] 机器人找到: ${robot.name}`);
+    console.log(`[WorkTool Callback] 机器人已激活: ${activation.robot_id}, device_id=${activation.device_id}`);
 
     // TODO: 实现消息转发逻辑
     // 目前直接返回成功
@@ -107,7 +113,8 @@ async function handleMessageCallback(robotId: string, body: MessageCallbackReque
       message: '消息接收成功',
       data: {
         messageId: body.messageId,
-        botId: robotId,
+        robotId,
+        deviceId: activation.device_id,
         receivedAt: new Date().toISOString(),
       },
     });

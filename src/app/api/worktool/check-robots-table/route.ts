@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 
 /**
- * 列出所有已激活的机器人
+ * 检查 robots 表结构
  */
 export async function GET(request: NextRequest) {
   try {
@@ -10,38 +10,31 @@ export async function GET(request: NextRequest) {
     const client = await poolInstance.connect();
 
     try {
-      // 从 device_activations 表获取已激活的机器人
-      const result = await client.query(
-        `SELECT
-          id,
-          robot_id,
-          robot_uuid,
-          device_id,
-          status,
-          activated_at,
-          last_active_at
-        FROM device_activations
-        ORDER BY id
-        LIMIT 10`
-      );
+      // 检查 robots 表中是否包含 robot_id 或 bot_id 字段
+      const columnsQuery = await client.query(`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'robots'
+        ORDER BY ordinal_position
+      `);
 
       return NextResponse.json({
         code: 200,
-        message: '查询成功',
+        message: '检查成功',
         data: {
-          count: result.rows.length,
-          robots: result.rows,
+          columnCount: columnsQuery.rows.length,
+          columns: columnsQuery.rows,
         },
       });
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error('[WorkTool List Robots] 查询失败:', error);
+    console.error('[WorkTool Check Robots Table] 检查失败:', error);
     return NextResponse.json(
       {
         code: 500,
-        message: '查询失败',
+        message: '检查失败',
         error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
