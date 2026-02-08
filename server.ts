@@ -21,7 +21,7 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 console.log('[Server] Initializing Next.js...');
-app.prepare().then(() => {
+app.prepare().then(async () => {
   console.log('[Server] Next.js initialized successfully');
 
   const server = createServer(async (req, res) => {
@@ -37,7 +37,7 @@ app.prepare().then(() => {
 
   console.log('[Server] Initializing WebSocket server...');
   try {
-    initializeWebSocketServer(server);
+    await initializeWebSocketServer(server);
     console.log('[Server] WebSocket server initialized successfully');
   } catch (err) {
     console.error('[Server] Failed to initialize WebSocket server:', err);

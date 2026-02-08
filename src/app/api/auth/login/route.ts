@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { generateAccessToken, generateRefreshToken, JWTPayload } from "@/lib/jwt";
 import { z } from "zod";
 import bcrypt from 'bcryptjs';
@@ -13,7 +13,8 @@ const loginSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const client = await pool.connect();
+  const poolInstance = await getPool();
+  const client = await poolInstance.connect();
   try {
     const body = await request.json();
     const validatedData = loginSchema.parse(body);

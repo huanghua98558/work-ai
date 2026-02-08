@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
 /**
@@ -17,7 +17,8 @@ import { requireAuth } from "@/lib/auth";
  * - 最近的激活码
  */
 export async function GET(request: NextRequest) {
-  const client = await pool.connect();
+  const poolInstance = await getPool();
+  const client = await poolInstance.connect();
   try {
     const user = requireAuth(request);
 

@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { IncomingMessage } from 'http';
-import { pool } from '@/lib/db';
+import { getPool } from '@/lib/db';
 
 // 扩展全局类型，支持 WebSocket 连接存储
 declare global {
@@ -8,7 +8,7 @@ declare global {
   var __webSocketServerStatus: 'running' | 'stopped' | undefined;
 }
 
-console.log('[WebSocket] Module loaded (instance:', Date.now(), '), connection pool imported');
+console.log('[WebSocket] Module loaded (instance:', Date.now(), ')');
 
 // WebSocket 连接存储
 interface WSConnection {
@@ -48,10 +48,15 @@ if (typeof global !== 'undefined' && global.__webSocketServerStatus) {
 /**
  * 初始化 WebSocket 服务器
  */
-export function initializeWebSocketServer(server: any) {
+export async function initializeWebSocketServer(server: any) {
   console.log('[WebSocket] Initializing WebSocket server...');
 
   try {
+    // 初始化数据库连接池
+    console.log('[WebSocket] Initializing database connection pool...');
+    await getPool();
+    console.log('[WebSocket] Database connection pool initialized');
+
     // 立即更新服务器状态为运行中
     globalServerStatus = 'running';
     if (typeof global !== 'undefined') {
@@ -124,7 +129,8 @@ export function initializeWebSocketServer(server: any) {
         }, AUTH_TIMEOUT);
 
         // 验证 Token 和设备绑定
-        const client = await pool.connect();
+        const poolInstance = await getPool();
+        const client = await poolInstance.connect();
         try {
           // 查找 token 记录
           const tokenResult = await client.query(
@@ -311,7 +317,8 @@ export function initializeWebSocketServer(server: any) {
         }, AUTH_TIMEOUT);
 
         // 验证 Token（简化版本，实际需要完整的 Token 验证）
-        const client = await pool.connect();
+        const poolInstance = await getPool();
+        const client = await poolInstance.connect();
         try {
           // 查找 token 记录
           const tokenResult = await client.query(
@@ -513,7 +520,8 @@ async function handleLogStreamMessage(robotId: string, message: any, ws: WebSock
  */
 async function updateRobotStatus(robotId: string, status: any) {
   try {
-    const client = await pool.connect();
+    const poolInstance = await getPool();
+    const client = await poolInstance.connect();
     try {
       await client.query(
         'UPDATE device_bindings SET last_active_at = NOW() WHERE robot_id = $1',

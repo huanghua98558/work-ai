@@ -8,6 +8,7 @@ import { isProduction, isDevelopment, isTest } from "./env-validation";
 let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 let _connectionRetries = 0;
+let _initializationPromise: Promise<{ pool: Pool; db: ReturnType<typeof drizzle> }> | null = null;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1秒
 
@@ -78,8 +79,19 @@ function getPoolConfig(): PoolConfig {
 }
 
 // 初始化数据库连接池（延迟执行，带重试）
-async function initializeDatabase(retry: boolean = false) {
-  if (!_pool) {
+async function initializeDatabase(retry: boolean = false): Promise<{ pool: Pool; db: ReturnType<typeof drizzle> }> {
+  // 如果已经初始化，直接返回
+  if (_pool && _db && _initializationPromise) {
+    return { pool: _pool, db: _db };
+  }
+
+  // 如果正在初始化，等待初始化完成
+  if (_initializationPromise) {
+    return _initializationPromise;
+  }
+
+  // 开始初始化
+  _initializationPromise = (async () => {
     const poolConfig = getPoolConfig();
 
     try {
@@ -100,6 +112,8 @@ async function initializeDatabase(retry: boolean = false) {
 
       // 重置重试计数
       _connectionRetries = 0;
+
+      return { pool: _pool, db: _db };
 
     } catch (error) {
       console.error('[数据库] 连接池初始化失败:', error);
@@ -122,9 +136,14 @@ async function initializeDatabase(retry: boolean = false) {
 
       throw new Error(`数据库连接失败（已重试 ${_connectionRetries} 次）: ${error}`);
     }
-  }
+  })();
 
-  return { pool: _pool, db: _db };
+  try {
+    return await _initializationPromise;
+  } catch (error) {
+    _initializationPromise = null;
+    throw error;
+  }
 }
 
 // 设置连接池事件监听器
@@ -224,16 +243,28 @@ export function getPoolStats(pool?: Pool) {
   };
 }
 
-// 获取连接池供直接使用
-export function getPool() {
-  const { pool: connectionPool } = initializeDatabase();
+// 获取连接池供直接使用（异步）
+export async function getPool(): Promise<Pool> {
+  const { pool: connectionPool } = await initializeDatabase();
   return connectionPool;
+}
+
+// 同步获取连接池（用于紧急情况，如果未初始化会抛出错误）
+export function getPoolSync(): Pool {
+  if (!_pool) {
+    throw new Error('数据库连接池未初始化，请先调用 getPool() 或 getDatabase()');
+  }
+  return _pool;
 }
 
 // 向后兼容的 pool 导出（延迟初始化）
 export const pool = new Proxy({} as Pool, {
   get(_target, prop) {
-    const connectionPool = getPool();
+    const connectionPool = _pool;
+    if (!connectionPool) {
+      // 如果连接池未初始化，抛出错误
+      throw new Error('数据库连接池未初始化，请先调用 getPool() 或 getDatabase()');
+    }
     return connectionPool[prop as keyof Pool];
   },
 });
@@ -256,6 +287,7 @@ export async function closeDatabase() {
     await _pool.end();
     _pool = null;
     _db = null;
+    _initializationPromise = null;
     console.log('[数据库] 连接池已关闭');
   }
 }

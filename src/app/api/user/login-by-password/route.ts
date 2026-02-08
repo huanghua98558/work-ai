@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { pool } from '@/lib/db';
+import { getPool } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 从数据库查询用户
-    const client = await pool.connect();
+    const poolInstance = await getPool();
+    const client = await poolInstance.connect();
     try {
       const result = await client.query(
         'SELECT id, phone, password_hash, nickname, role, status, avatar FROM users WHERE phone = $1 AND status = $2',
