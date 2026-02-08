@@ -40,6 +40,8 @@ import {
   Edit,
   Eye,
   AlertTriangle,
+  Play,
+  Pause,
 } from 'lucide-react';
 
 interface ActivationCode {
@@ -78,6 +80,11 @@ export default function ActivationCodesPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
+
+  // 自动刷新相关状态
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(30); // 默认 30 秒
+  const [countdown, setCountdown] = useState(refreshInterval);
   
   // 生成激活码弹窗
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -95,8 +102,12 @@ export default function ActivationCodesPage() {
   const [viewingCode, setViewingCode] = useState<ActivationCode | null>(null);
 
   // 加载数据
-  const loadData = async (retryCount = 0) => {
+  const loadData = async (retryCount = 0, showLoading = true) => {
     try {
+      if (showLoading) {
+        setLoading(true);
+      }
+
       const token = localStorage.getItem('token');
       if (!token) {
         console.log('[激活码管理] Token 不存在，跳转到登录页');
@@ -158,7 +169,7 @@ export default function ActivationCodesPage() {
             });
 
             // 使用新的 Token 重新加载
-            return loadData(retryCount + 1);
+            return loadData(retryCount + 1, showLoading);
           } else if (checkData.success && checkData.data && checkData.data.consistent) {
             // 角色一致但仍然没有权限
             console.log('[激活码管理] 角色一致但仍然没有权限');
@@ -188,32 +199,40 @@ export default function ActivationCodesPage() {
         setCodes(codesData.data);
       } else {
         console.error('加载激活码失败:', codesData.error);
-        toast({
-          title: '加载失败',
-          description: codesData.error || '加载激活码数据失败',
-          variant: 'destructive',
-        });
+        if (showLoading) {
+          toast({
+            title: '加载失败',
+            description: codesData.error || '加载激活码数据失败',
+            variant: 'destructive',
+          });
+        }
       }
 
       if (robotsData.success) {
         setRobots(robotsData.data);
       } else {
         console.error('加载机器人失败:', robotsData.error);
-        toast({
-          title: '加载失败',
-          description: robotsData.error || '加载机器人数据失败',
-          variant: 'destructive',
-        });
+        if (showLoading) {
+          toast({
+            title: '加载失败',
+            description: robotsData.error || '加载机器人数据失败',
+            variant: 'destructive',
+          });
+        }
       }
     } catch (error) {
       console.error('加载数据失败:', error);
-      toast({
-        title: '加载失败',
-        description: '请稍后重试',
-        variant: 'destructive',
-      });
+      if (showLoading) {
+        toast({
+          title: '加载失败',
+          description: '请稍后重试',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
       setRefreshing(false);
     }
   };
@@ -222,10 +241,72 @@ export default function ActivationCodesPage() {
     loadData();
   }, []);
 
+  // 自动刷新逻辑
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (autoRefresh) {
+      // 倒计时
+      const countdownId = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            // 倒计时结束，触发刷新
+            loadData();
+            return refreshInterval; // 重置倒计时
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      intervalId = countdownId;
+    } else {
+      setCountdown(refreshInterval);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoRefresh, refreshInterval]);
+
   // 刷新列表
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadData(0, false); // 不显示加载状态
+  };
+
+  // 切换自动刷新
+  const handleToggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+    if (!autoRefresh) {
+      // 开启自动刷新
+      toast({
+        title: '自动刷新已开启',
+        description: `每 ${refreshInterval} 秒自动刷新一次`,
+        variant: 'success',
+      });
+    } else {
+      // 关闭自动刷新
+      toast({
+        title: '自动刷新已关闭',
+        variant: 'default',
+      });
+    }
+  };
+
+  // 更改刷新间隔
+  const handleChangeRefreshInterval = (value: string) => {
+    const newInterval = parseInt(value);
+    setRefreshInterval(newInterval);
+    setCountdown(newInterval);
+    if (autoRefresh) {
+      toast({
+        title: '刷新间隔已更新',
+        description: `每 ${newInterval} 秒自动刷新一次`,
+        variant: 'success',
+      });
+    }
   };
 
   // 复制激活码
@@ -286,7 +367,7 @@ export default function ActivationCodesPage() {
         setNotes('');
         setBatchCount('1');
         // 立即刷新列表
-        await loadData();
+        await loadData(0, false);
       } else {
         toast({
           title: '创建失败',
@@ -353,7 +434,7 @@ export default function ActivationCodesPage() {
         });
         setEditDialogOpen(false);
         setEditingCode(null);
-        await loadData();
+        await loadData(0, false);
       } else {
         toast({
           title: '更新失败',
@@ -397,7 +478,7 @@ export default function ActivationCodesPage() {
           description: '激活码已删除',
           variant: 'success',
         });
-        await loadData();
+        await loadData(0, false);
       } else {
         toast({
           title: '删除失败',
@@ -445,7 +526,7 @@ export default function ActivationCodesPage() {
           description: '设备已解绑',
           variant: 'success',
         });
-        await loadData();
+        await loadData(0, false);
       } else {
         toast({
           title: '解绑失败',
@@ -571,6 +652,54 @@ export default function ActivationCodesPage() {
                 <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 刷新列表
               </Button>
+
+              {/* 自动刷新控制 */}
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${autoRefresh ? 'bg-white/20 border-white/50' : 'bg-white/10 border-white/30'}`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleToggleAutoRefresh}
+                  className={`h-8 px-2 ${autoRefresh ? 'text-green-300 hover:text-green-200' : 'text-white hover:text-white/80'}`}
+                >
+                  {autoRefresh ? (
+                    <>
+                      <Pause className="h-4 w-4 mr-1" />
+                      <span className="text-sm">暂停</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-1" />
+                      <span className="text-sm">开启</span>
+                    </>
+                  )}
+                </Button>
+
+                {autoRefresh && (
+                  <>
+                    <div className="h-4 w-px bg-white/30"></div>
+                    <Select
+                      value={refreshInterval.toString()}
+                      onValueChange={handleChangeRefreshInterval}
+                    >
+                      <SelectTrigger className="w-28 h-8 bg-white/10 border-white/30 text-white text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15秒</SelectItem>
+                        <SelectItem value="30">30秒</SelectItem>
+                        <SelectItem value="60">1分钟</SelectItem>
+                        <SelectItem value="120">2分钟</SelectItem>
+                        <SelectItem value="300">5分钟</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="h-4 w-px bg-white/30"></div>
+                    <div className="flex items-center gap-1.5 text-white text-sm bg-white/10 px-2 py-1 rounded">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span className="font-mono font-bold">{countdown}s</span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
