@@ -257,7 +257,7 @@ export default function KnowledgePage() {
               构建企业知识库，支持文档、URL、数据库多种数据源，让 AI 更懂业务
             </p>
             <div className="flex gap-3">
-              <Button className="bg-white text-indigo-600 hover:bg-indigo-50">
+              <Button className="bg-white text-indigo-600 hover:bg-indigo-50" onClick={() => setCreateDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 创建知识库
               </Button>

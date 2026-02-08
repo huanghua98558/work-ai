@@ -275,7 +275,7 @@ export default function UsersPage() {
               管理系统用户，支持角色权限配置、激活码绑定和账户状态管理
             </p>
             <div className="flex gap-3">
-              <Button className="bg-white text-rose-600 hover:bg-rose-50">
+              <Button className="bg-white text-rose-600 hover:bg-rose-50" onClick={() => setCreateDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 新增用户
               </Button>
