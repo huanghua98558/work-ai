@@ -9,6 +9,7 @@ import {
   integer,
   decimal,
   index,
+  bigint,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -271,6 +272,48 @@ export const aiLogs = pgTable(
   })
 );
 
+// 日志远程调度表
+export const logs = pgTable(
+  "logs",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    robotId: varchar("robot_id", { length: 64 }).notNull(),
+    timestamp: bigint("timestamp", { mode: "number" }).notNull(), // Unix 毫秒时间戳，使用 bigint
+    level: integer("level").notNull(), // 0-5 (VERBOSE, DEBUG, INFO, WARN, ERROR, FATAL)
+    tag: varchar("tag", { length: 128 }).notNull(), // 日志标签（来源模块）
+    message: text("message").notNull(),
+    extra: text("extra"), // JSON 格式存储扩展信息
+    stackTrace: text("stack_trace"),
+    syncStatus: varchar("sync_status", { length: 20 }).notNull().default("pending"), // pending, syncing, success, failed, ignored
+    syncTime: bigint("sync_time", { mode: "number" }), // Unix 秒时间戳，使用 bigint
+    deviceId: varchar("device_id", { length: 128 }),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    robotIdIdx: index("logs_robot_id_idx").on(table.robotId),
+    timestampIdx: index("logs_timestamp_idx").on(table.timestamp),
+    levelIdx: index("logs_level_idx").on(table.level),
+    tagIdx: index("logs_tag_idx").on(table.tag),
+    syncStatusIdx: index("logs_sync_status_idx").on(table.syncStatus),
+  })
+);
+
+// 日志配置表
+export const logConfigs = pgTable(
+  "log_configs",
+  {
+    robotId: varchar("robot_id", { length: 64 }).primaryKey(),
+    logLevel: integer("log_level").notNull().default(2), // 默认 INFO
+    uploadEnabled: boolean("upload_enabled").notNull().default(true),
+    uploadInterval: integer("upload_interval").notNull().default(300000), // 5分钟
+    uploadOnWifiOnly: boolean("upload_on_wifi_only").notNull().default(true),
+    maxLogEntries: integer("max_log_entries").notNull().default(10000),
+    retentionDays: integer("retention_days").notNull().default(30),
+    tags: text("tags"), // JSON 格式存储各模块的日志级别配置
+    updatedAt: timestamp("updated_at").defaultNow(),
+  }
+);
+
 // 统计数据表
 export const statistics = pgTable(
   "statistics",
@@ -311,6 +354,33 @@ export const systemConfigs = pgTable(
 );
 
 // Zod schemas for validation
+
+// 日志相关 schemas
+export const insertLogSchema = z.object({
+  id: z.string().min(1).max(64),
+  robotId: z.string().min(1).max(64),
+  timestamp: z.number().int(),
+  level: z.number().int().min(0).max(5),
+  tag: z.string().min(1).max(128),
+  message: z.string().min(1),
+  extra: z.string().optional(),
+  stackTrace: z.string().optional(),
+  syncStatus: z.enum(["pending", "syncing", "success", "failed", "ignored"]).optional(),
+  syncTime: z.number().int().optional(),
+  deviceId: z.string().max(128).optional(),
+});
+
+export const insertLogConfigSchema = z.object({
+  robotId: z.string().min(1).max(64),
+  logLevel: z.number().int().min(0).max(5).optional(),
+  uploadEnabled: z.boolean().optional(),
+  uploadInterval: z.number().int().optional(),
+  uploadOnWifiOnly: z.boolean().optional(),
+  maxLogEntries: z.number().int().optional(),
+  retentionDays: z.number().int().optional(),
+  tags: z.string().optional(),
+});
+
 export const insertUserSchema = z.object({
   nickname: z.string().min(1).max(100).optional(),
   avatar: z.string().optional(),
@@ -433,3 +503,7 @@ export type DocumentTag = typeof documentTags.$inferSelect;
 export type AiLog = typeof aiLogs.$inferSelect;
 export type Statistics = typeof statistics.$inferSelect;
 export type SystemConfig = typeof systemConfigs.$inferSelect;
+export type Log = typeof logs.$inferSelect;
+export type InsertLog = z.infer<typeof insertLogSchema>;
+export type LogConfig = typeof logConfigs.$inferSelect;
+export type InsertLogConfig = z.infer<typeof insertLogConfigSchema>;

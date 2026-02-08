@@ -63,10 +63,15 @@ export function initializeWebSocketServer(server: any) {
       try {
         const { pathname } = new URL(request.url || '', `http://${request.headers.host}`);
 
-        // 只处理 /ws 路径
+        // 处理 /ws 路径（机器人连接）
         if (pathname === '/ws') {
           wss.handleUpgrade(request, socket, head, (ws: any) => {
             wss.emit('connection', ws, request);
+          });
+        } else if (pathname === '/api/v1/logs/stream') {
+          // 处理日志流 WebSocket 连接
+          wss.handleUpgrade(request, socket, head, (ws: any) => {
+            wss.emit('logStreamConnection', ws, request);
           });
         } else {
           socket.destroy();
@@ -265,6 +270,134 @@ export function initializeWebSocketServer(server: any) {
       }
     });
 
+    // 处理日志流连接
+    wss.on('logStreamConnection', async (ws: WebSocket, request: IncomingMessage) => {
+      let isAuthenticated = false;
+      let authTimeoutTimer: NodeJS.Timeout | null = null;
+      let authenticatedRobotId: string | null = null;
+      let authenticatedUserId: number | null = null;
+
+      try {
+        const { searchParams } = new URL(request.url || '', `http://${request.headers.host}`);
+        const robotId = searchParams.get('robotId');
+        const token = searchParams.get('token');
+
+        console.log(`[LogStream] 新连接尝试: robotId=${robotId}`);
+
+        // 验证参数
+        if (!robotId || !token) {
+          const errorMsg = {
+            type: 'error',
+            code: 4001,
+            message: '缺少必要参数：robotId 和 token',
+          };
+          ws.send(JSON.stringify(errorMsg));
+          ws.close(4001, '缺少必要参数');
+          return;
+        }
+
+        // 设置认证超时
+        authTimeoutTimer = setTimeout(() => {
+          if (!isAuthenticated) {
+            console.log(`[LogStream] 机器人 ${robotId} 认证超时`);
+            const errorMsg = {
+              type: 'error',
+              code: 4006,
+              message: '认证超时',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4006, '认证超时');
+          }
+        }, AUTH_TIMEOUT);
+
+        // 验证 Token（简化版本，实际需要完整的 Token 验证）
+        const client = await pool.connect();
+        try {
+          // 查找 token 记录
+          const tokenResult = await client.query(
+            `SELECT * FROM device_tokens WHERE access_token = $1 AND robot_id = $2`,
+            [token, robotId]
+          );
+
+          if (tokenResult.rows.length === 0) {
+            if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+            const errorMsg = {
+              type: 'error',
+              code: 4001,
+              message: 'Token 无效',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4001, 'Token 无效');
+            return;
+          }
+
+          const tokenRecord = tokenResult.rows[0];
+
+          // 检查 token 是否过期
+          if (new Date() > new Date(tokenRecord.expires_at)) {
+            if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+            const errorMsg = {
+              type: 'error',
+              code: 4007,
+              message: 'Token 已过期',
+            };
+            ws.send(JSON.stringify(errorMsg));
+            ws.close(4007, 'Token 已过期');
+            return;
+          }
+
+          // 认证成功
+          isAuthenticated = true;
+          authenticatedRobotId = robotId;
+          if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+
+          console.log(`[LogStream] 机器人 ${robotId} 已认证并连接到日志流`);
+
+          // 发送认证成功消息
+          ws.send(JSON.stringify({
+            type: 'authenticated',
+            message: '认证成功',
+            data: {
+              robotId,
+              timestamp: Date.now(),
+            },
+          }));
+
+          // 处理消息（接收客户端的日志推送请求等）
+          ws.on('message', async (data: Buffer) => {
+            try {
+              const message = JSON.parse(data.toString());
+              await handleLogStreamMessage(robotId, message, ws);
+            } catch (error) {
+              console.error(`[LogStream] 消息处理错误:`, error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                code: 4000,
+                message: '消息格式错误',
+              }));
+            }
+          });
+
+          // 处理关闭
+          ws.on('close', () => {
+            console.log(`[LogStream] 机器人 ${robotId} 已断开日志流`);
+          });
+
+          // 处理错误
+          ws.on('error', (error) => {
+            console.error(`[LogStream] 机器人 ${robotId} 连接错误:`, error);
+          });
+
+        } finally {
+          client.release();
+        }
+      } catch (error) {
+        console.error('[LogStream] 连接处理错误:', error);
+        if (authTimeoutTimer) clearTimeout(authTimeoutTimer);
+        ws.close(1000, '连接处理失败');
+      }
+    });
+
     // 启动心跳检测
     try {
       startHeartbeatCheck();
@@ -317,6 +450,57 @@ async function handleWsMessage(robotId: string, message: any, connection: WSConn
 
     default:
       connection.ws.send(JSON.stringify({
+        type: 'error',
+        code: 4000,
+        message: `未知的消息类型: ${type}`,
+      }));
+  }
+}
+
+/**
+ * 处理日志流消息
+ */
+async function handleLogStreamMessage(robotId: string, message: any, ws: WebSocket) {
+  const { type, data } = message;
+
+  switch (type) {
+    case 'ping':
+      // 心跳响应
+      ws.send(JSON.stringify({
+        type: 'pong',
+        timestamp: Date.now(),
+      }));
+      break;
+
+    case 'subscribe':
+      // 订阅实时日志推送
+      console.log(`[LogStream] 机器人 ${robotId} 订阅实时日志推送`);
+      // TODO: 实现实时日志推送逻辑
+      ws.send(JSON.stringify({
+        type: 'subscribed',
+        message: '订阅成功',
+        data: {
+          robotId,
+          timestamp: Date.now(),
+        },
+      }));
+      break;
+
+    case 'unsubscribe':
+      // 取消订阅
+      console.log(`[LogStream] 机器人 ${robotId} 取消订阅实时日志推送`);
+      ws.send(JSON.stringify({
+        type: 'unsubscribed',
+        message: '取消订阅成功',
+        data: {
+          robotId,
+          timestamp: Date.now(),
+        },
+      }));
+      break;
+
+    default:
+      ws.send(JSON.stringify({
         type: 'error',
         code: 4000,
         message: `未知的消息类型: ${type}`,
