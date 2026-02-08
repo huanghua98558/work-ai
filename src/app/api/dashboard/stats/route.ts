@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
       robotsResult,
       activationCodesResult,
       onlineRobotsResult,
+      messagesTotalResult,
+      messagesTodayResult,
+      conversationsTotalResult,
+      activeUsersResult,
     ] = await Promise.all([
       // 机器人总数
       client.query(
@@ -46,6 +50,26 @@ export async function GET(request: NextRequest) {
       // 在线机器人数量
       client.query(
         `SELECT COUNT(*) as total FROM robots WHERE status = 'online'`
+      ),
+
+      // 消息总数
+      client.query(
+        `SELECT COUNT(*) as total FROM messages`
+      ),
+
+      // 今日消息数
+      client.query(
+        `SELECT COUNT(*) as total FROM messages WHERE DATE(created_at) = CURRENT_DATE`
+      ),
+
+      // 对话总数（统计不同的 conversation_id）
+      client.query(
+        `SELECT COUNT(DISTINCT conversation_id) as total FROM messages`
+      ),
+
+      // 活跃用户数（最近 7 天有活动的不同 member_id）
+      client.query(
+        `SELECT COUNT(DISTINCT member_id) as total FROM messages WHERE created_at >= NOW() - INTERVAL '7 days' AND member_id IS NOT NULL`
       ),
     ]);
 
@@ -89,11 +113,11 @@ export async function GET(request: NextRequest) {
       unusedActivationCodes: parseInt(activationCodesResult.rows[0].unused),
       usedActivationCodes: parseInt(activationCodesResult.rows[0].used),
       expiredActivationCodes: parseInt(activationCodesResult.rows[0].expired),
-      totalConversations: 0, // 暂时不统计对话数
-      totalMessages: 0, // 暂时不统计消息数
+      totalConversations: parseInt(conversationsTotalResult.rows[0].total),
+      totalMessages: parseInt(messagesTotalResult.rows[0].total),
       activeRobots: parseInt(onlineRobotsResult.rows[0].total),
-      todayMessages: 0, // 暂时不统计今日消息数
-      activeUsers: 0, // 暂时不统计活跃用户数
+      todayMessages: parseInt(messagesTodayResult.rows[0].total),
+      activeUsers: parseInt(activeUsersResult.rows[0].total),
     };
 
     // 格式化最近机器人数据

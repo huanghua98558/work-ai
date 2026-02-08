@@ -350,7 +350,7 @@ export default function DashboardPage() {
 
           <StatCard
             title="活跃用户"
-            value="28"
+            value={stats.activeUsers}
             description="最近 7 天活跃"
             icon={Users}
             gradient="from-pink-500 to-pink-600"
@@ -358,8 +358,8 @@ export default function DashboardPage() {
 
           <StatCard
             title="响应速度"
-            value="1.2s"
-            description="平均响应时间"
+            value="N/A"
+            description="暂未统计"
             icon={Clock}
             gradient="from-cyan-500 to-cyan-600"
           />
