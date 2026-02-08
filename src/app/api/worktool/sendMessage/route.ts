@@ -117,8 +117,7 @@ export async function POST(request: NextRequest) {
         // WebSocket 发送失败，更新命令状态
         await client.query(
           `UPDATE commands SET status = 'failed', error_message = $1 WHERE id = $2`,
-          ['机器人未连接'],
-          [commandId]
+          ['机器人未连接', commandId]
         );
 
         return NextResponse.json(
