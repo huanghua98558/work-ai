@@ -44,6 +44,12 @@ interface Robot {
   status: 'online' | 'offline';
   aiMode: 'builtin' | 'third_party';
   aiProvider: string;
+  aiModel: string;
+  aiApiKey?: string;
+  aiTemperature: number;
+  aiMaxTokens: number;
+  aiContextLength: number;
+  aiScenario?: string;
   totalMessages: number;
   lastActiveAt: string;
   createdAt: string;
@@ -57,11 +63,33 @@ export default function RobotsPage() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [selectedRobot, setSelectedRobot] = useState<Robot | null>(null);
   const [configData, setConfigData] = useState({
+    // 系统提示
     systemPrompt: '',
+    // 知识库配置
     enableKnowledgeBase: false,
     knowledgeDataset: '',
+    // 流式回复
     enableStreamResponse: true,
+    // AI 模式
+    aiMode: 'builtin' as 'builtin' | 'third_party',
+    // AI 提供商
+    aiProvider: 'doubao',
+    // AI 模型
+    aiModel: '',
+    // API Key
+    aiApiKey: '',
+    // 温度参数
     temperature: 0.7,
+    // 最大 tokens
+    maxTokens: 2000,
+    // 上下文长度
+    contextLength: 10,
+    // 场景
+    scenario: '',
+    // 第三方回调 URL
+    thirdPartyCallbackUrl: '',
+    thirdPartyResultCallbackUrl: '',
+    thirdPartySecretKey: '',
   });
 
   // 加载机器人列表
@@ -100,6 +128,12 @@ export default function RobotsPage() {
             status: robot.status === 'online' ? 'online' : 'offline',
             aiMode: robot.ai_mode || 'builtin',
             aiProvider: robot.ai_provider || 'doubao',
+            aiModel: robot.ai_model || '',
+            aiApiKey: robot.ai_api_key || '',
+            aiTemperature: parseFloat(robot.ai_temperature) || 0.7,
+            aiMaxTokens: robot.ai_max_tokens || 2000,
+            aiContextLength: robot.ai_context_length || 10,
+            aiScenario: robot.ai_scenario || '',
             totalMessages: robot.total_messages || 0,
             lastActiveAt: robot.last_active_at ? new Date(robot.last_active_at).toLocaleDateString('zh-CN') : '-',
             createdAt: new Date(robot.created_at).toLocaleDateString('zh-CN'),
@@ -149,13 +183,75 @@ export default function RobotsPage() {
   const openConfigDialog = (robot: Robot) => {
     setSelectedRobot(robot);
     setConfigData({
-      systemPrompt: '',
-      enableKnowledgeBase: false,
-      knowledgeDataset: '',
-      enableStreamResponse: true,
-      temperature: 0.7,
+      systemPrompt: robot.systemPrompt || '',
+      enableKnowledgeBase: robot.enableKnowledgeBase || false,
+      knowledgeDataset: robot.knowledgeDataset || '',
+      enableStreamResponse: robot.enableStreamResponse !== false,
+      aiMode: robot.aiMode || 'builtin',
+      aiProvider: robot.aiProvider || 'doubao',
+      aiModel: robot.aiModel || '',
+      aiApiKey: robot.aiApiKey || '',
+      temperature: robot.aiTemperature || 0.7,
+      maxTokens: robot.aiMaxTokens || 2000,
+      contextLength: robot.aiContextLength || 10,
+      scenario: robot.aiScenario || '',
+      thirdPartyCallbackUrl: robot.thirdPartyCallbackUrl || '',
+      thirdPartyResultCallbackUrl: robot.thirdPartyResultCallbackUrl || '',
+      thirdPartySecretKey: robot.thirdPartySecretKey || '',
     });
     setConfigDialogOpen(true);
+  };
+
+  // 删除机器人
+  const [deletingRobotId, setDeletingRobotId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const openDeleteDialog = (robot: Robot) => {
+    setSelectedRobot(robot);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteRobot = async () => {
+    if (!selectedRobot) return;
+
+    try {
+      setDeletingRobotId(selectedRobot.robotId);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch(`/api/robots/${selectedRobot.robotId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "成功",
+          description: "机器人已删除",
+        });
+        setDeleteDialogOpen(false);
+        loadRobots();
+      } else {
+        toast({
+          title: "删除失败",
+          description: data.error || "删除机器人失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('删除机器人失败:', error);
+      toast({
+        title: "删除失败",
+        description: error.message || "删除机器人失败",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingRobotId(null);
+    }
   };
 
   if (loading) {
@@ -343,11 +439,18 @@ export default function RobotsPage() {
                             >
                               <Settings className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-green-600">
-                              <Power className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-red-600">
-                              <Trash2 className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600"
+                              onClick={() => openDeleteDialog(robot)}
+                              disabled={deletingRobotId === robot.robotId}
+                            >
+                              {deletingRobotId === robot.robotId ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -362,63 +465,229 @@ export default function RobotsPage() {
 
         {/* Config Dialog */}
         <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>机器人配置</DialogTitle>
               <DialogDescription>
                 配置机器人 {selectedRobot?.robotId}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* AI 模式选择 */}
               <div className="space-y-2">
-                <Label>系统提示</Label>
+                <Label className="text-base font-medium">AI 模式</Label>
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    variant={configData.aiMode === 'builtin' ? 'default' : 'outline'}
+                    onClick={() => setConfigData({ ...configData, aiMode: 'builtin' })}
+                    className="flex-1"
+                  >
+                    <Zap className="w-4 h-4 mr-2" />
+                    内置模型
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={configData.aiMode === 'third_party' ? 'default' : 'outline'}
+                    onClick={() => setConfigData({ ...configData, aiMode: 'third_party' })}
+                    className="flex-1"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    第三方 API
+                  </Button>
+                </div>
+              </div>
+
+              {/* AI 提供商选择 */}
+              {configData.aiMode === 'builtin' && (
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">AI 提供商</Label>
+                  <Select
+                    value={configData.aiProvider}
+                    onValueChange={(value) => setConfigData({ ...configData, aiProvider: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择 AI 提供商" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="doubao">豆包 (Doubao)</SelectItem>
+                      <SelectItem value="deepseek">DeepSeek</SelectItem>
+                      <SelectItem value="kimi">Kimi</SelectItem>
+                      <SelectItem value="openai">OpenAI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* AI 模型 */}
+              <div className="space-y-2">
+                <Label className="text-base font-medium">AI 模型</Label>
+                <Input
+                  placeholder="例如: gpt-3.5-turbo, doubao-pro, deepseek-chat"
+                  value={configData.aiModel}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, aiModel: e.target.value })}
+                />
+                <p className="text-xs text-gray-500">留空则使用提供商的默认模型</p>
+              </div>
+
+              {/* API Key (第三方模式) */}
+              {configData.aiMode === 'third_party' && (
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">API Key</Label>
+                  <Input
+                    type="password"
+                    placeholder="输入 API Key"
+                    value={configData.aiApiKey}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, aiApiKey: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500">第三方 API 认证密钥</p>
+                </div>
+              )}
+
+              {/* 第三方回调 URL */}
+              {configData.aiMode === 'third_party' && (
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">第三方回调配置</Label>
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-sm">请求回调 URL</Label>
+                      <Input
+                        placeholder="https://your-api.com/callback"
+                        value={configData.thirdPartyCallbackUrl}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, thirdPartyCallbackUrl: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">结果回调 URL</Label>
+                      <Input
+                        placeholder="https://your-api.com/result-callback"
+                        value={configData.thirdPartyResultCallbackUrl}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, thirdPartyResultCallbackUrl: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">回调密钥</Label>
+                      <Input
+                        type="password"
+                        placeholder="回调验证密钥"
+                        value={configData.thirdPartySecretKey}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, thirdPartySecretKey: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 场景选择 */}
+              <div className="space-y-2">
+                <Label className="text-base font-medium">使用场景</Label>
+                <Select
+                  value={configData.scenario}
+                  onValueChange={(value) => setConfigData({ ...configData, scenario: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择使用场景" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">通用</SelectItem>
+                    <SelectItem value="consult">咨询服务</SelectItem>
+                    <SelectItem value="qa">问答助手</SelectItem>
+                    <SelectItem value="chat">闲聊陪伴</SelectItem>
+                    <SelectItem value="after-sales">售后支持</SelectItem>
+                    <SelectItem value="community">社群管理</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 参数设置 */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">参数设置</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* 温度 */}
+                  <div className="space-y-2">
+                    <Label>温度 ({configData.temperature})</Label>
+                    <Input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={configData.temperature}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, temperature: parseFloat(e.target.value) })}
+                    />
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>保守</span>
+                      <span>创意</span>
+                    </div>
+                  </div>
+
+                  {/* 最大 tokens */}
+                  <div className="space-y-2">
+                    <Label>最大 Tokens</Label>
+                    <Input
+                      type="number"
+                      min="100"
+                      max="8000"
+                      step="100"
+                      value={configData.maxTokens}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, maxTokens: parseInt(e.target.value) })}
+                    />
+                  </div>
+
+                  {/* 上下文长度 */}
+                  <div className="space-y-2">
+                    <Label>上下文长度</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={configData.contextLength}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, contextLength: parseInt(e.target.value) })}
+                    />
+                    <p className="text-xs text-gray-500">保留的对话上下文条数</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 系统提示 */}
+              <div className="space-y-2">
+                <Label className="text-base font-medium">系统提示</Label>
                 <Textarea
-                  placeholder="输入机器人的系统提示..."
+                  placeholder="输入机器人的系统提示，定义机器人的行为和风格..."
                   value={configData.systemPrompt}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setConfigData({ ...configData, systemPrompt: e.target.value })}
                   rows={4}
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <Label>启用知识库</Label>
-                <Switch
-                  checked={configData.enableKnowledgeBase}
-                  onCheckedChange={(checked: boolean) => setConfigData({ ...configData, enableKnowledgeBase: checked })}
-                />
+              {/* 知识库配置 */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">知识库配置</Label>
+                <div className="flex items-center justify-between">
+                  <Label>启用知识库</Label>
+                  <Switch
+                    checked={configData.enableKnowledgeBase}
+                    onCheckedChange={(checked: boolean) => setConfigData({ ...configData, enableKnowledgeBase: checked })}
+                  />
+                </div>
+                {configData.enableKnowledgeBase && (
+                  <div className="space-y-2">
+                    <Label>知识库数据集 ID</Label>
+                    <Input
+                      placeholder="输入知识库数据集 ID"
+                      value={configData.knowledgeDataset}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, knowledgeDataset: e.target.value })}
+                    />
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <Label>知识库数据集</Label>
-                <Input
-                  value={configData.knowledgeDataset}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, knowledgeDataset: e.target.value })}
-                />
-              </div>
-
+              {/* 流式回复 */}
               <div className="flex items-center justify-between">
-                <Label>流式回复</Label>
+                <Label className="text-base font-medium">流式回复</Label>
                 <Switch
                   checked={configData.enableStreamResponse}
                   onCheckedChange={(checked: boolean) => setConfigData({ ...configData, enableStreamResponse: checked })}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label>温度 ({configData.temperature})</Label>
-                <Input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={configData.temperature}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfigData({ ...configData, temperature: parseFloat(e.target.value) })}
-                />
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>保守</span>
-                  <span>平衡</span>
-                  <span>创意</span>
-                </div>
               </div>
 
               <Button onClick={handleSaveConfig} className="w-full">
@@ -427,7 +696,50 @@ export default function RobotsPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>确认删除</DialogTitle>
+              <DialogDescription>
+                确定要删除机器人 <strong>{selectedRobot?.name}</strong> 吗？
+                <br />
+                机器人 ID: <code>{selectedRobot?.robotId}</code>
+                <br />
+                此操作不可撤销！
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+                disabled={deletingRobotId !== null}
+              >
+                取消
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteRobot}
+                disabled={deletingRobotId !== null}
+              >
+                {deletingRobotId ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    删除中...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    确认删除
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
 }
+
