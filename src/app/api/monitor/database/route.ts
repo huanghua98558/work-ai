@@ -9,7 +9,7 @@ import { getPool, getPoolStats } from '@/lib/db';
  */
 export async function GET() {
   try {
-    const pool = getPool();
+    const pool = await getPool();
     const stats = getPoolStats(pool);
 
     if (!stats) {

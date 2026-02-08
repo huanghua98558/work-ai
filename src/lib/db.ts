@@ -272,9 +272,9 @@ export const pool = new Proxy({} as Pool, {
 // 向后兼容的 db 导出（延迟初始化）
 export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(_target, prop) {
-    const { db: database } = initializeDatabase();
+    const database = _db;
     if (!database) {
-      throw new Error('数据库连接未初始化');
+      throw new Error('数据库连接未初始化，请先调用 getDatabase()');
     }
     return database[prop as keyof typeof database];
   },

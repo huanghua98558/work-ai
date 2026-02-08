@@ -144,7 +144,6 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set("x-user-id", user.userId?.toString() || "");
       requestHeaders.set("x-user-phone", user.phone || "");
       requestHeaders.set("x-user-role", user.role || "");
-      requestHeaders.set("x-user-name", user.name || "");
 
       const response = NextResponse.next({
         request: {

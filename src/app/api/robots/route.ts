@@ -117,6 +117,7 @@ export async function GET(request: NextRequest) {
  * 二选一，激活码或机器人ID
  */
 export async function POST(request: NextRequest) {
+  const pool = await getPool();
   const client = await pool.connect();
   try {
     const user = requireAuth(request);
@@ -273,6 +274,7 @@ export async function POST(request: NextRequest) {
  * PUT /api/robots/:id
  */
 export async function PUT(request: NextRequest) {
+  const pool = await getPool();
   const client = await pool.connect();
   try {
     const user = requireAuth(request);
@@ -364,6 +366,7 @@ export async function PUT(request: NextRequest) {
  * DELETE /api/robots/:id
  */
 export async function DELETE(request: NextRequest) {
+  const pool = await getPool();
   const client = await pool.connect();
   try {
     const user = requireAuth(request);

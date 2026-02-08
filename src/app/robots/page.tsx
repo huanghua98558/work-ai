@@ -10,6 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -17,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
   Bot,
@@ -42,6 +50,10 @@ interface Robot {
   name: string;
   nickname?: string;
   status: 'online' | 'offline';
+  systemPrompt?: string;
+  enableKnowledgeBase?: boolean;
+  knowledgeDataset?: string;
+  enableStreamResponse?: boolean;
   aiMode: 'builtin' | 'third_party';
   aiProvider: string;
   aiModel: string;
@@ -50,6 +62,9 @@ interface Robot {
   aiMaxTokens: number;
   aiContextLength: number;
   aiScenario?: string;
+  thirdPartyCallbackUrl?: string;
+  thirdPartyResultCallbackUrl?: string;
+  thirdPartySecretKey?: string;
   totalMessages: number;
   lastActiveAt: string;
   createdAt: string;

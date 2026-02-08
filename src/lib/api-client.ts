@@ -147,6 +147,17 @@ export const apiClient = {
   },
 
   /**
+   * PATCH 请求
+   */
+  async patch<T = any>(url: string, data: any): Promise<{ data: T }> {
+    const response = await authenticatedFetch(url, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return { data: response };
+  },
+
+  /**
    * DELETE 请求
    */
   async delete<T = any>(url: string): Promise<{ data: T }> {
