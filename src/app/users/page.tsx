@@ -25,87 +25,229 @@ import {
   Mail,
   Phone,
   MoreVertical,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
 interface User {
   id: number;
-  username: string;
-  email: string;
-  phone: string | null;
-  status: 'active' | 'inactive' | 'banned';
-  role: 'admin' | 'user' | 'vip';
-  createdAt: string;
-  lastLoginAt: string | null;
-  robotsCount: number;
-  activationCode: string | null;
+  nickname: string;
+  phone: string;
+  role: 'admin' | 'user';
+  status: 'active' | 'disabled';
+  created_at: string;
+  last_login_at: string | null;
+  avatar: string | null;
 }
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // 创建用户对话框状态
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    nickname: '',
+    phone: '',
+    password: '',
+    role: 'user',
+    status: 'active',
+  });
+  const [creating, setCreating] = useState(false);
+
+  // 编辑用户对话框状态
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
+    nickname: '',
+    role: 'user',
+    status: 'active',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/api/users', {
+        params: {
+          search: searchQuery || undefined,
+          page,
+          limit: 20,
+        },
+      });
+
+      if (response.success) {
+        setUsers(response.data);
+        setTotal(response.pagination.total);
+      } else {
+        toast({
+          title: "加载失败",
+          description: response.error || "加载用户列表失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('加载用户列表失败:', error);
+      toast({
+        title: "加载失败",
+        description: error.message || "加载用户列表失败",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // 模拟数据加载
-    const mockUsers: User[] = [
-      {
-        id: 1,
-        username: 'admin',
-        email: 'admin@workbot.com',
-        phone: '13800138000',
-        status: 'active',
-        role: 'admin',
-        createdAt: '2024-01-01',
-        lastLoginAt: '2024-02-15 10:30',
-        robotsCount: 5,
-        activationCode: 'ADMIN2024',
-      },
-      {
-        id: 2,
-        username: 'zhangsan',
-        email: 'zhangsan@example.com',
-        phone: '13800138001',
-        status: 'active',
-        role: 'user',
-        createdAt: '2024-01-15',
-        lastLoginAt: '2024-02-14 09:15',
-        robotsCount: 2,
-        activationCode: 'ABCD1234',
-      },
-      {
-        id: 3,
-        username: 'lisi',
-        email: 'lisi@example.com',
-        phone: null,
-        status: 'active',
-        role: 'vip',
-        createdAt: '2024-02-01',
-        lastLoginAt: '2024-02-15 14:20',
-        robotsCount: 10,
-        activationCode: 'EFGH5678',
-      },
-      {
-        id: 4,
-        username: 'wangwu',
-        email: 'wangwu@example.com',
-        phone: '13800138003',
-        status: 'inactive',
-        role: 'user',
-        createdAt: '2024-02-10',
-        lastLoginAt: null,
-        robotsCount: 0,
-        activationCode: null,
-      },
-    ];
-    setUsers(mockUsers);
-    setLoading(false);
-  }, []);
+    loadUsers();
+  }, [page]);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      loadUsers();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleCreateUser = async () => {
+    if (!createUserForm.phone || !createUserForm.password) {
+      toast({
+        title: "提示",
+        description: "手机号和密码不能为空",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const response = await apiClient.post('/api/users', createUserForm);
+
+      if (response.success) {
+        toast({
+          title: "创建成功",
+          description: "用户创建成功",
+        });
+        setCreateDialogOpen(false);
+        setCreateUserForm({
+          nickname: '',
+          phone: '',
+          password: '',
+          role: 'user',
+          status: 'active',
+        });
+        loadUsers();
+      } else {
+        toast({
+          title: "创建失败",
+          description: response.error || "创建用户失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('创建用户失败:', error);
+      toast({
+        title: "创建失败",
+        description: error.message || "创建用户失败",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleEditUser = async () => {
+    if (!editingUser) return;
+
+    try {
+      setSaving(true);
+      const response = await apiClient.put(`/api/users/${editingUser.id}`, editUserForm);
+
+      if (response.success) {
+        toast({
+          title: "更新成功",
+          description: "用户信息更新成功",
+        });
+        setEditDialogOpen(false);
+        setEditingUser(null);
+        loadUsers();
+      } else {
+        toast({
+          title: "更新失败",
+          description: response.error || "更新用户失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('更新用户失败:', error);
+      toast({
+        title: "更新失败",
+        description: error.message || "更新用户失败",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number, userName: string) => {
+    if (!confirm(`确定要删除用户 "${userName}" 吗？`)) {
+      return;
+    }
+
+    try {
+      const response = await apiClient.delete(`/api/users/${userId}`);
+
+      if (response.success) {
+        toast({
+          title: "删除成功",
+          description: "用户删除成功",
+        });
+        loadUsers();
+      } else {
+        toast({
+          title: "删除失败",
+          description: response.error || "删除用户失败",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('删除用户失败:', error);
+      toast({
+        title: "删除失败",
+        description: error.message || "删除用户失败",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditDialog = (user: User) => {
+    setEditingUser(user);
+    setEditUserForm({
+      nickname: user.nickname,
+      role: user.role,
+      status: user.status,
+    });
+    setEditDialogOpen(true);
+  };
 
   if (loading) {
     return (
@@ -157,7 +299,7 @@ export default function UsersPage() {
               <Users className="h-4 w-4 text-rose-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{users.length}</div>
+              <div className="text-3xl font-bold">{total}</div>
               <p className="text-sm text-rose-100 mt-1">注册用户</p>
             </CardContent>
           </Card>
@@ -177,27 +319,27 @@ export default function UsersPage() {
 
           <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-50">VIP 用户</CardTitle>
+              <CardTitle className="text-sm font-medium text-red-50">管理员</CardTitle>
               <Crown className="h-4 w-4 text-red-100" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {users.filter(u => u.role === 'vip').length}
+                {users.filter(u => u.role === 'admin').length}
               </div>
-              <p className="text-sm text-red-100 mt-1">会员用户</p>
+              <p className="text-sm text-red-100 mt-1">管理员账户</p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-orange-50">机器人总数</CardTitle>
-              <Shield className="h-4 w-4 text-orange-100" />
+              <CardTitle className="text-sm font-medium text-orange-50">普通用户</CardTitle>
+              <UserIcon className="h-4 w-4 text-orange-100" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {users.reduce((sum, u) => sum + u.robotsCount, 0)}
+                {users.filter(u => u.role === 'user').length}
               </div>
-              <p className="text-sm text-orange-100 mt-1">已配置</p>
+              <p className="text-sm text-orange-100 mt-1">注册用户</p>
             </CardContent>
           </Card>
         </div>
@@ -240,123 +382,255 @@ export default function UsersPage() {
                     <TableHead>用户</TableHead>
                     <TableHead>角色</TableHead>
                     <TableHead>状态</TableHead>
-                    <TableHead>激活码</TableHead>
-                    <TableHead>机器人数</TableHead>
                     <TableHead>注册时间</TableHead>
                     <TableHead>最后登录</TableHead>
                     <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-semibold flex items-center gap-2">
-                            {user.role === 'admin' && <Crown className="h-4 w-4 text-yellow-500" />}
-                            {user.username}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                            <Mail className="h-3 w-3" />
-                            {user.email}
-                          </div>
-                          {user.phone && (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                        暂无用户数据
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-semibold flex items-center gap-2">
+                              {user.role === 'admin' && <Crown className="h-4 w-4 text-yellow-500" />}
+                              {user.nickname}
+                            </div>
                             <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
                               <Phone className="h-3 w-3" />
                               {user.phone}
                             </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            user.role === 'admin' ? 'default' : user.role === 'vip' ? 'secondary' : 'outline'
-                          }
-                        >
-                          {user.role === 'admin' ? (
-                            <span className="flex items-center gap-1">
-                              <Crown className="h-3 w-3" />
-                              管理员
-                            </span>
-                          ) : user.role === 'vip' ? (
-                            <span className="flex items-center gap-1">
-                              <Crown className="h-3 w-3" />
-                              VIP
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.role === 'admin' ? 'default' : 'outline'}>
+                            {user.role === 'admin' ? (
+                              <span className="flex items-center gap-1">
+                                <Crown className="h-3 w-3" />
+                                管理员
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <UserIcon className="h-3 w-3" />
+                                用户
+                              </span>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.status === 'active' ? 'default' : 'outline'}>
+                            {user.status === 'active' ? (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" />
+                                正常
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <XCircle className="h-3 w-3" />
+                                已禁用
+                              </span>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                            <Clock className="h-4 w-4" />
+                            {new Date(user.created_at).toLocaleDateString('zh-CN')}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.last_login_at ? (
+                            <span className="text-gray-600 dark:text-gray-400 text-sm">
+                              {new Date(user.last_login_at).toLocaleString('zh-CN')}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1">
-                              <UserIcon className="h-3 w-3" />
-                              用户
-                            </span>
+                            <span className="text-gray-400 text-sm">从未登录</span>
                           )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.status === 'active' ? 'default' : 'outline'}>
-                          {user.status === 'active' ? (
-                            <span className="flex items-center gap-1">
-                              <CheckCircle className="h-3 w-3" />
-                              正常
-                            </span>
-                          ) : user.status === 'inactive' ? (
-                            <span className="flex items-center gap-1">
-                              <XCircle className="h-3 w-3" />
-                              未激活
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <XCircle className="h-3 w-3" />
-                              已禁用
-                            </span>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.activationCode ? (
-                          <code className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm">
-                            {user.activationCode}
-                          </code>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Shield className="h-4 w-4 text-gray-600" />
-                          {user.robotsCount}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                          <Clock className="h-4 w-4" />
-                          {user.createdAt}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {user.lastLoginAt ? (
-                          <span className="text-gray-600 dark:text-gray-400">{user.lastLoginAt}</span>
-                        ) : (
-                          <span className="text-gray-400">从未登录</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" className="text-rose-600">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-600"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600"
+                              onClick={() => handleDeleteUser(user.id, user.nickname)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
         </Card>
+
+        {/* 创建用户对话框 */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>创建新用户</DialogTitle>
+              <DialogDescription>填写用户信息以创建新账户</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="nickname" className="text-right">
+                  昵称
+                </Label>
+                <Input
+                  id="nickname"
+                  value={createUserForm.nickname}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, nickname: e.target.value })}
+                  className="col-span-3"
+                  placeholder="请输入昵称"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right">
+                  手机号
+                </Label>
+                <Input
+                  id="phone"
+                  value={createUserForm.phone}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, phone: e.target.value })}
+                  className="col-span-3"
+                  placeholder="请输入手机号"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">
+                  密码
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={createUserForm.password}
+                  onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                  className="col-span-3"
+                  placeholder="请输入密码"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="role" className="text-right">
+                  角色
+                </Label>
+                <Select
+                  value={createUserForm.role}
+                  onValueChange={(value) => setCreateUserForm({ ...createUserForm, role: value as 'admin' | 'user' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">用户</SelectItem>
+                    <SelectItem value="admin">管理员</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleCreateUser} disabled={creating}>
+                {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                创建
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 编辑用户对话框 */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>编辑用户</DialogTitle>
+              <DialogDescription>修改用户信息</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-nickname" className="text-right">
+                  昵称
+                </Label>
+                <Input
+                  id="edit-nickname"
+                  value={editUserForm.nickname}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, nickname: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-role" className="text-right">
+                  角色
+                </Label>
+                <Select
+                  value={editUserForm.role}
+                  onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value as 'admin' | 'user' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">用户</SelectItem>
+                    <SelectItem value="admin">管理员</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-status" className="text-right">
+                  状态
+                </Label>
+                <Select
+                  value={editUserForm.status}
+                  onValueChange={(value) => setEditUserForm({ ...editUserForm, status: value as 'active' | 'disabled' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">正常</SelectItem>
+                    <SelectItem value="disabled">禁用</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleEditUser} disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                保存
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
