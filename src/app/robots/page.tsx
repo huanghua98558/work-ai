@@ -100,7 +100,7 @@ export default function RobotsPage() {
     // 上下文长度
     contextLength: 10,
     // 场景
-    scenario: '',
+    scenario: 'general',
     // 第三方回调 URL
     thirdPartyCallbackUrl: '',
     thirdPartyResultCallbackUrl: '',
@@ -148,7 +148,7 @@ export default function RobotsPage() {
             aiTemperature: parseFloat(robot.ai_temperature) || 0.7,
             aiMaxTokens: robot.ai_max_tokens || 2000,
             aiContextLength: robot.ai_context_length || 10,
-            aiScenario: robot.ai_scenario || '',
+            aiScenario: robot.ai_scenario || 'general',
             totalMessages: robot.total_messages || 0,
             lastActiveAt: robot.last_active_at ? new Date(robot.last_active_at).toLocaleDateString('zh-CN') : '-',
             createdAt: new Date(robot.created_at).toLocaleDateString('zh-CN'),
@@ -209,7 +209,7 @@ export default function RobotsPage() {
       temperature: robot.aiTemperature || 0.7,
       maxTokens: robot.aiMaxTokens || 2000,
       contextLength: robot.aiContextLength || 10,
-      scenario: robot.aiScenario || '',
+      scenario: robot.aiScenario || 'general',
       thirdPartyCallbackUrl: robot.thirdPartyCallbackUrl || '',
       thirdPartyResultCallbackUrl: robot.thirdPartyResultCallbackUrl || '',
       thirdPartySecretKey: robot.thirdPartySecretKey || '',
@@ -604,7 +604,7 @@ export default function RobotsPage() {
                     <SelectValue placeholder="选择使用场景" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">通用</SelectItem>
+                    <SelectItem value="general">通用</SelectItem>
                     <SelectItem value="consult">咨询服务</SelectItem>
                     <SelectItem value="qa">问答助手</SelectItem>
                     <SelectItem value="chat">闲聊陪伴</SelectItem>

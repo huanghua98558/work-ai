@@ -363,7 +363,54 @@ export default function DashboardPage() {
             icon={Clock}
             gradient="from-cyan-500 to-cyan-600"
           />
+
+          <StatCard
+            title="WebSocket 连接"
+            value={websocketData.totalConnections}
+            description={websocketData.serverStatus === 'running' ? '服务运行中' : '服务未运行'}
+            icon={websocketData.serverStatus === 'running' ? Wifi : WifiOff}
+            gradient={websocketData.serverStatus === 'running' ? 'from-emerald-500 to-emerald-600' : 'from-gray-500 to-gray-600'}
+          />
         </div>
+
+        {/* WebSocket 连接详情 */}
+        {websocketData.totalConnections > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wifi className="h-5 w-5 text-emerald-600" />
+                WebSocket 在线连接
+              </CardTitle>
+              <CardDescription>实时显示当前的 WebSocket 连接状态</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>机器人 ID</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>连接时间</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {websocketData.onlineRobots.map((robot) => (
+                    <TableRow key={robot.robotId}>
+                      <TableCell className="font-medium">{robot.robotId}</TableCell>
+                      <TableCell>
+                        <Badge variant="default" className="bg-green-500">在线</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {robot.connectedAt
+                          ? new Date(robot.connectedAt).toLocaleString('zh-CN')
+                          : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 快速操作 - 使用鲜艳的渐变色大卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
