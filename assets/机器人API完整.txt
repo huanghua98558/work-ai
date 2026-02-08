@@ -3235,7 +3235,33 @@ object 
         }
     }}
 
-
+收藏消息指令解析
+{
+  "commandType": 900,
+  "commandData": {
+    "targetChat": "工作群",      // 给谁发消息（群名或人名）
+    "locatorType": "INDEX",     // 定位方式
+    "index": 0                   // 收藏夹中第几条收藏（从0开始）
+  }
+}
+参数说明
+参数	说明	示例
+targetChat	目标接收者：群名或人名	"工作群"（群发）或 "张三"（私发）
+locatorType	定位收藏的方式	"INDEX"、"KEYWORD"、"TIME"
+index	按索引定位时的收藏序号	0 = 第 1 条收藏，1 = 第 2 条收藏
+keyword	按关键词搜索收藏	"重要通知"
+timePattern	按时间定位收藏	"2024-01-15"
+已回答的问题
+✅ 给谁发消息：targetChat 参数
+群发：targetChat: "工作群"
+私发：targetChat: "张三"
+✅ 私发还是群发：通过 targetChat 的值区分
+如果是群名 → 群发
+如果是人名 → 私发
+✅ 发的第几条收藏：
+locatorType: "INDEX" + index: 0 → 第 1 条收藏
+locatorType: "INDEX" + index: 1 → 第 2 条收藏
+依次类推...
 
 
 
