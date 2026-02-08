@@ -31,17 +31,17 @@ function getPoolConfig(): PoolConfig {
   const connectionString = getConnectionString();
   const env = process.env.NODE_ENV || 'development';
 
-  // 根据环境调整连接池大小
+  // 根据环境调整连接池大小（优化内存使用）
   let maxConnections, minConnections;
 
   if (isProduction()) {
-    // 生产环境：更大的连接池
-    maxConnections = 50;
-    minConnections = 10;
-  } else if (isDevelopment()) {
-    // 开发环境：适中的连接池
+    // 生产环境：适中的连接池（减少内存占用）
     maxConnections = 20;
-    minConnections = 2;
+    minConnections = 5;
+  } else if (isDevelopment()) {
+    // 开发环境：较小的连接池
+    maxConnections = 10;
+    minConnections = 1;
   } else {
     // 测试环境：最小的连接池
     maxConnections = 5;
@@ -53,11 +53,11 @@ function getPoolConfig(): PoolConfig {
     max: maxConnections,
     min: minConnections,
 
-    // 空闲连接超时（30秒后回收空闲连接）
-    idleTimeoutMillis: 30000,
+    // 空闲连接超时（10秒后回收空闲连接，减少内存占用）
+    idleTimeoutMillis: 10000,
 
-    // 连接超时（15秒）
-    connectionTimeoutMillis: 15000,
+    // 连接超时（10秒）
+    connectionTimeoutMillis: 10000,
 
     // 查询超时（30秒）
     query_timeout: 30000,
@@ -65,8 +65,8 @@ function getPoolConfig(): PoolConfig {
     // 保持连接活跃
     keepAlive: true,
 
-    // 连接活跃初始延迟（10秒）
-    keepAliveInitialDelayMillis: 10000,
+    // 连接活跃初始延迟（5秒）
+    keepAliveInitialDelayMillis: 5000,
 
     // 应用名称（便于在数据库中识别连接）
     application_name: `workbot-${env}`,

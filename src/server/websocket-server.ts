@@ -35,6 +35,9 @@ const HEARTBEAT_TIMEOUT = 60 * 1000; // 60秒
 // 认证超时时间（毫秒）
 const AUTH_TIMEOUT = 30 * 1000; // 30秒
 
+// 最大连接数限制（防止内存耗尽）
+const MAX_WS_CONNECTIONS = 100;
+
 // 心跳检测定时器
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
@@ -111,6 +114,19 @@ export async function initializeWebSocketServer(server: any) {
           };
           ws.send(JSON.stringify(errorMsg));
           ws.close(4001, '缺少必要参数');
+          return;
+        }
+
+        // 检查连接数限制
+        if (connections.size >= MAX_WS_CONNECTIONS) {
+          console.warn(`[WebSocket] 连接数已达上限 (${MAX_WS_CONNECTIONS})，拒绝新连接`);
+          const errorMsg = {
+            type: 'error',
+            code: 4029,
+            message: `服务器连接数已达上限 (${MAX_WS_CONNECTIONS})`,
+          };
+          ws.send(JSON.stringify(errorMsg));
+          ws.close(4029, '连接数超限');
           return;
         }
 

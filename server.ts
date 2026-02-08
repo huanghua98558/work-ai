@@ -8,6 +8,12 @@ import { cleanupZombieProcesses, getSystemStats } from './src/lib/process-cleanu
 // 首先加载环境变量
 config();
 
+// 增加 Node.js 内存限制（防止 OOM）
+if (process.env.NODE_OPTIONS === undefined) {
+  process.env.NODE_OPTIONS = '--max-old-space-size=2048';
+}
+console.log('[Server] NODE_OPTIONS:', process.env.NODE_OPTIONS);
+
 // 强制设置端口为 5000，防止被其他配置覆盖
 process.env.PORT = '5000';
 

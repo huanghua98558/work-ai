@@ -14,7 +14,10 @@
     "db:studio": "drizzle-kit studio",
     "check-env": "bash scripts/check-env.sh",
     "check-types": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "monitor": "bash scripts/monitor.sh",
+    "recovery": "bash scripts/recovery.sh",
+    "diagnose": "bash scripts/diagnose.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",
