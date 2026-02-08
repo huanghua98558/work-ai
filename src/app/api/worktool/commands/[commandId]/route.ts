@@ -7,10 +7,10 @@ import type { CommandDetailResponse } from '@/types/worktool';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { commandId: string } }
+  { params }: { params: Promise<{ commandId: string }> }
 ) {
   try {
-    const { commandId } = params;
+    const { commandId } = await params;
 
     if (!commandId) {
       return NextResponse.json(
