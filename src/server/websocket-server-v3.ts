@@ -421,3 +421,21 @@ export function getQueueStats(): {
 
 // 向后兼容的导出
 export { sendToRobot as sendWebSocketMessage };
+
+/**
+ * 获取连接信息
+ */
+export function getConnectionInfo(robotId: string): any {
+  const connection = connectionManager.getConnection(robotId);
+  if (!connection) {
+    return undefined;
+  }
+
+  return {
+    robotId: connection.robotId,
+    userId: connection.userId,
+    deviceId: connection.deviceId,
+    connectedAt: connection.connectedAt,
+    lastHeartbeatAt: connection.lastHeartbeatAt,
+  };
+}
