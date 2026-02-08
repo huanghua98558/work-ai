@@ -14,7 +14,7 @@ import { WSMessage, WSMessageType } from './websocket/types';
 // 扩展全局类型
 declare global {
   var __webSocketServerStatus: 'running' | 'stopped' | undefined;
-  var __webSocketServerV3: WebSocket.Server | undefined;
+  var __webSocketServerV3: any;
 }
 
 // 全局服务器状态
