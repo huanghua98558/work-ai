@@ -29,7 +29,12 @@ function initializeDatabase() {
       connectionString,
       max: 20, // 最大连接数
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 15000, // 增加到15秒，适应部署环境
+      query_timeout: 30000, // 查询超时30秒
+      retry: {
+        retries: 3, // 重试3次
+        delay: 1000, // 重试间隔1秒
+      },
     });
 
     _db = drizzle(_pool, { schema });
@@ -40,8 +45,28 @@ function initializeDatabase() {
 
 // 获取数据库连接（异步，兼容现有代码）
 export async function getDatabase() {
-  const { db: database } = initializeDatabase();
+  const { db: database, pool } = initializeDatabase();
+
+  // 添加连接健康检查
+  try {
+    await pool.query('SELECT 1');
+  } catch (error) {
+    console.error('[数据库] 连接健康检查失败:', error);
+    throw new Error('数据库连接失败，请检查网络和配置');
+  }
+
   return database;
+}
+
+// 检查数据库连接健康状态
+export async function checkDatabaseHealth() {
+  try {
+    const { pool } = initializeDatabase();
+    const result = await pool.query('SELECT 1');
+    return { healthy: true, message: '数据库连接正常' };
+  } catch (error: any) {
+    return { healthy: false, message: `数据库连接失败: ${error.message}` };
+  }
 }
 
 // 获取连接池供直接使用
