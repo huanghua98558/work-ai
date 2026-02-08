@@ -8,8 +8,8 @@ import { z } from "zod";
 
 const listMessagesSchema = z.object({
   robotId: z.string().min(1),
-  userId: z.string().optional(),
-  sessionId: z.string().optional(),
+  memberId: z.string().optional(),
+  conversationId: z.string().optional(),
   messageType: z.string().optional(),
   direction: z.enum(['incoming', 'outgoing', 'all']).optional().default('all'),
   limit: z.number().optional().default(50),
@@ -24,25 +24,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const validatedData = listMessagesSchema.parse({
       robotId: searchParams.get('robotId'),
-      userId: searchParams.get('userId') || undefined,
-      sessionId: searchParams.get('sessionId') || undefined,
+      memberId: searchParams.get('memberId') || undefined,
+      conversationId: searchParams.get('conversationId') || undefined,
       messageType: searchParams.get('messageType') || undefined,
       direction: searchParams.get('direction') || 'all',
       limit: parseInt(searchParams.get('limit') || '50'),
       offset: parseInt(searchParams.get('offset') || '0'),
     });
 
-    const { robotId, userId, sessionId, messageType, direction, limit, offset } = validatedData;
+    const { robotId, memberId, conversationId, messageType, direction, limit, offset } = validatedData;
 
     const db = await getDatabase();
 
     // 构建查询条件
     let whereClause = sql`WHERE robot_id = ${robotId}`;
-    if (userId) {
-      whereClause = sql`${whereClause} AND user_id = ${userId}`;
+    if (memberId) {
+      whereClause = sql`${whereClause} AND member_id = ${memberId}`;
     }
-    if (sessionId) {
-      whereClause = sql`${whereClause} AND session_id = ${sessionId}`;
+    if (conversationId) {
+      whereClause = sql`${whereClause} AND conversation_id = ${conversationId}`;
     }
     if (messageType) {
       whereClause = sql`${whereClause} AND message_type = ${messageType}`;
@@ -56,16 +56,18 @@ export async function GET(request: NextRequest) {
       SELECT
         id,
         robot_id,
-        user_id,
-        session_id,
+        member_id,
+        conversation_id,
         message_type,
         content,
-        extra_data,
-        status,
+        media_url,
+        ai_generated,
+        ai_model,
+        ai_tokens_used,
+        ai_cost,
+        metadata,
         direction,
-        reply_to_message_id,
-        created_at,
-        updated_at
+        created_at
       FROM messages
       ${whereClause}
       ORDER BY created_at DESC
@@ -81,16 +83,18 @@ export async function GET(request: NextRequest) {
     const messages = messagesResult.rows.map((row: any) => ({
       id: row.id,
       robotId: row.robot_id,
-      userId: row.user_id,
-      sessionId: row.session_id,
+      memberId: row.member_id,
+      conversationId: row.conversation_id,
       messageType: row.message_type,
       content: row.content,
-      extraData: row.extra_data,
-      status: row.status,
+      mediaUrl: row.media_url,
+      aiGenerated: row.ai_generated,
+      aiModel: row.ai_model,
+      aiTokensUsed: row.ai_tokens_used,
+      aiCost: row.ai_cost,
+      metadata: row.metadata,
       direction: row.direction,
-      replyToMessageId: row.reply_to_message_id,
       createdAt: row.created_at,
-      updatedAt: row.updated_at,
     }));
 
     return NextResponse.json({
