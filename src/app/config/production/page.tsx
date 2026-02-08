@@ -109,13 +109,13 @@ export default function ProductionConfigPage() {
                   # 使用 Node.js
                 </p>
                 <p className="text-sm font-mono text-gray-700 dark:text-gray-300">
-                  node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+                  node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&apos;base64&apos;))&quot;
                 </p>
                 <p className="text-sm font-mono mt-3 mb-2 text-gray-900 dark:text-gray-200">
                   # 使用 Python
                 </p>
                 <p className="text-sm font-mono text-gray-700 dark:text-gray-300">
-                  python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+                  python3 -c &quot;import secrets; print(secrets.token_urlsafe(32))&quot;
                 </p>
               </div>
             </div>

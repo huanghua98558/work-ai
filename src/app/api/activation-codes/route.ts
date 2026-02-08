@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     const result = await client.query(query, params);
 
     // 格式化返回数据
-    const formattedData = result.rows.map(row => ({
+    const formattedData = result.rows.map((row: any) => ({
       ...row,
       isActivated: !!row.bound_device_id, // 是否已激活（绑定了设备）
       isBound: !!row.bound_user_id,       // 是否已绑定用户

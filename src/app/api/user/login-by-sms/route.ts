@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
 
     // 生成 JWT Token
     const payload: JWTPayload = {
-      userId: user.id,
-      phone: user.phone,
-      role: user.role,
+      userId: user.id as number,
+      phone: user.phone as string,
+      role: user.role as string,
     };
 
     const accessToken = generateAccessToken(payload);

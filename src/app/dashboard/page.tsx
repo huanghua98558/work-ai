@@ -106,10 +106,10 @@ export default function DashboardPage() {
       setLoading(true)
 
       // 尝试从缓存读取数据
-      const cachedStats = getCachedData(CACHE_KEYS.STATS)
-      const cachedConversations = getCachedData(CACHE_KEYS.CONVERSATIONS)
-      const cachedRobots = getCachedData(CACHE_KEYS.ROBOTS)
-      const cachedActivationCodes = getCachedData('dashboard_activation_codes')
+      const cachedStats = getCachedData<typeof stats & { timestamp: number }>(CACHE_KEYS.STATS)
+      const cachedConversations = getCachedData<typeof recentConversations>(CACHE_KEYS.CONVERSATIONS)
+      const cachedRobots = getCachedData<typeof recentRobots>(CACHE_KEYS.ROBOTS)
+      const cachedActivationCodes = getCachedData<typeof recentActivationCodes>('dashboard_activation_codes')
 
       if (cachedStats && cachedConversations && cachedRobots && cachedActivationCodes) {
         // 使用缓存数据快速渲染
@@ -179,8 +179,9 @@ export default function DashboardPage() {
       setRecentActivationCodes(apiData.recentActivationCodes || [])
       setLastUpdated(Date.now())
 
-      // 更新缓存
-      setCachedData(CACHE_KEYS.STATS, newStats)
+      // 更新缓存（包含 timestamp）
+      const now = Date.now()
+      setCachedData(CACHE_KEYS.STATS, { ...newStats, timestamp: now })
       setCachedData(CACHE_KEYS.CONVERSATIONS, newConversations)
       setCachedData(CACHE_KEYS.ROBOTS, newRobots)
       setCachedData('dashboard_activation_codes', apiData.recentActivationCodes || [])
@@ -205,9 +206,9 @@ export default function DashboardPage() {
     } catch (error: any) {
       console.error('Failed to refresh data:', error)
       // 使用缓存数据作为fallback
-      const cachedStats = getCachedData(CACHE_KEYS.STATS)
-      const cachedConversations = getCachedData(CACHE_KEYS.CONVERSATIONS)
-      const cachedRobots = getCachedData(CACHE_KEYS.ROBOTS)
+      const cachedStats = getCachedData<typeof stats>(CACHE_KEYS.STATS)
+      const cachedConversations = getCachedData<typeof recentConversations>(CACHE_KEYS.CONVERSATIONS)
+      const cachedRobots = getCachedData<typeof recentRobots>(CACHE_KEYS.ROBOTS)
 
       if (cachedStats) {
         setStats(cachedStats)

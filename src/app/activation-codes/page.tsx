@@ -647,7 +647,7 @@ export default function ActivationCodesPage() {
                     如何在激活码列表中看到机器人ID？
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300">
-                    创建激活码时，请选择 <span className="font-semibold">"绑定机器人"</span> 模式，并选择已存在的机器人。
+                    创建激活码时，请选择 <span className="font-semibold">&quot;绑定机器人&quot;</span> 模式，并选择已存在的机器人。
                     只有绑定机器人的激活码才会显示机器人ID，纯激活码激活时才会自动创建机器人。
                   </p>
                 </div>
@@ -701,7 +701,7 @@ export default function ActivationCodesPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyCode(code.robot_id)}
+                              onClick={() => code.robot_id && copyCode(code.robot_id)}
                               className="text-green-600"
                             >
                               <Copy className="h-4 w-4" />

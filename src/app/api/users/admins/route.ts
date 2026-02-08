@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     console.log('[Admins API] 查询结果（不区分大小写）:', admins.length, '个管理员');
     console.log('[Admins API] 管理员列表:', JSON.stringify(admins.map(a => ({
       id: a.id,
-      username: a.username,
+      nickname: a.nickname,
       phone: a.phone,
       role: a.role,
       hasPassword: !!a.passwordHash

@@ -117,8 +117,10 @@ export const apiClient = {
   /**
    * GET 请求
    */
-  async get<T = any>(url: string): Promise<{ data: T }> {
-    const response = await authenticatedFetch(url, { method: 'GET' });
+  async get<T = any>(url: string, params?: any): Promise<{ data: T }> {
+    // 如果有参数，将它们附加到 URL 上
+    const queryString = params ? `?${new URLSearchParams(params)}` : '';
+    const response = await authenticatedFetch(`${url}${queryString}`, { method: 'GET' });
     return { data: response };
   },
 

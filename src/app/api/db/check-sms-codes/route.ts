@@ -8,6 +8,12 @@ import { sql } from "drizzle-orm";
 export async function GET() {
   try {
     const db = await getDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: "数据库连接失败" },
+        { status: 500 }
+      );
+    }
 
     const result = await db.execute(sql`
       SELECT * FROM sms_verification_codes

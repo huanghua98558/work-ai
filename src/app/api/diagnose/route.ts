@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
  * 检查环境变量和数据库连接状态
  */
 export async function GET() {
-  const diagnostics = {
+  const diagnostics: any = {
     timestamp: new Date().toISOString(),
     environment: {
       nodeEnv: process.env.NODE_ENV,

@@ -98,13 +98,13 @@ export default function UsersPage() {
         },
       });
 
-      if (response.success) {
-        setUsers(response.data);
-        setTotal(response.pagination.total);
+      if (response.data.success) {
+        setUsers(response.data.data);
+        setTotal(response.data.pagination.total);
       } else {
         toast({
           title: "加载失败",
-          description: response.error || "加载用户列表失败",
+          description: response.data.error || "加载用户列表失败",
           variant: "destructive",
         });
       }
@@ -147,7 +147,7 @@ export default function UsersPage() {
       setCreating(true);
       const response = await apiClient.post('/api/users', createUserForm);
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "创建成功",
           description: "用户创建成功",
@@ -164,7 +164,7 @@ export default function UsersPage() {
       } else {
         toast({
           title: "创建失败",
-          description: response.error || "创建用户失败",
+          description: response.data.error || "创建用户失败",
           variant: "destructive",
         });
       }
@@ -187,7 +187,7 @@ export default function UsersPage() {
       setSaving(true);
       const response = await apiClient.put(`/api/users/${editingUser.id}`, editUserForm);
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "更新成功",
           description: "用户信息更新成功",
@@ -198,7 +198,7 @@ export default function UsersPage() {
       } else {
         toast({
           title: "更新失败",
-          description: response.error || "更新用户失败",
+          description: response.data.error || "更新用户失败",
           variant: "destructive",
         });
       }
@@ -222,7 +222,7 @@ export default function UsersPage() {
     try {
       const response = await apiClient.delete(`/api/users/${userId}`);
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "删除成功",
           description: "用户删除成功",
@@ -231,7 +231,7 @@ export default function UsersPage() {
       } else {
         toast({
           title: "删除失败",
-          description: response.error || "删除用户失败",
+          description: response.data.error || "删除用户失败",
           variant: "destructive",
         });
       }
@@ -258,7 +258,7 @@ export default function UsersPage() {
         status: newStatus,
       });
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: `${action}成功`,
           description: `用户已${action}`,
@@ -267,7 +267,7 @@ export default function UsersPage() {
       } else {
         toast({
           title: `${action}失败`,
-          description: response.error || `${action}用户失败`,
+          description: response.data.error || `${action}用户失败`,
           variant: "destructive",
         });
       }

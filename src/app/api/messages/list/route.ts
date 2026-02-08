@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       data: {
         messages,
         pagination: {
-          total: parseInt(countResult.rows[0].total),
+          total: parseInt(countResult.rows[0].total as string),
           limit,
           offset,
         },

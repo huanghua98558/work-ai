@@ -167,7 +167,7 @@ export class MessageHandler {
       `);
 
       if (result.rows.length > 0) {
-        const config = result.rows[0].config || {};
+        const config = (result.rows[0].config as any) || {};
         return {
           robotId,
           systemPrompt: config.systemPrompt,

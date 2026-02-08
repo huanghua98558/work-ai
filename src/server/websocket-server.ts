@@ -2,6 +2,12 @@ import WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 import { pool } from '@/lib/db';
 
+// 扩展全局类型，支持 WebSocket 连接存储
+declare global {
+  var __webSocketConnections: Map<string, any> | undefined;
+  var __webSocketServerStatus: 'running' | 'stopped' | undefined;
+}
+
 console.log('[WebSocket] Module loaded (instance:', Date.now(), '), connection pool imported');
 
 // WebSocket 连接存储
@@ -17,7 +23,6 @@ interface WSConnection {
 // 使用全局变量管理连接，避免开发环境模块多次加载导致状态丢失
 let connections = new Map<string, WSConnection>();
 if (typeof global !== 'undefined' && global.__webSocketConnections) {
-  // @ts-ignore
   connections = global.__webSocketConnections;
   console.log('[WebSocket] 从全局变量恢复连接列表，连接数:', connections.size);
 }
@@ -36,7 +41,6 @@ let heartbeatTimer: NodeJS.Timeout | null = null;
 // 全局服务器状态标志（模块加载之间保持一致）
 let globalServerStatus: 'running' | 'stopped' = 'stopped';
 if (typeof global !== 'undefined' && global.__webSocketServerStatus) {
-  // @ts-ignore
   globalServerStatus = global.__webSocketServerStatus;
   console.log('[WebSocket] 从全局变量恢复服务器状态:', globalServerStatus);
 }
@@ -51,7 +55,6 @@ export function initializeWebSocketServer(server: any) {
     // 立即更新服务器状态为运行中
     globalServerStatus = 'running';
     if (typeof global !== 'undefined') {
-      // @ts-ignore
       global.__webSocketServerStatus = 'running';
       console.log('[WebSocket] 已设置全局服务器状态为 running');
     }
@@ -194,7 +197,6 @@ export function initializeWebSocketServer(server: any) {
 
           // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
           if (typeof global !== 'undefined') {
-            // @ts-ignore
             global.__webSocketConnections = connections;
           }
 
@@ -241,7 +243,6 @@ export function initializeWebSocketServer(server: any) {
 
             // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
             if (typeof global !== 'undefined') {
-              // @ts-ignore
               global.__webSocketConnections = connections;
             }
 
@@ -255,7 +256,6 @@ export function initializeWebSocketServer(server: any) {
 
             // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
             if (typeof global !== 'undefined') {
-              // @ts-ignore
               global.__webSocketConnections = connections;
             }
           });
@@ -562,7 +562,6 @@ function startHeartbeatCheck() {
 
         // 保存到全局变量，避免开发环境模块多次加载导致状态丢失
         if (typeof global !== 'undefined') {
-          // @ts-ignore
           global.__webSocketConnections = connections;
         }
       }

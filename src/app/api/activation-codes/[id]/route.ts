@@ -12,7 +12,7 @@ import { z } from "zod";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const client = await pool.connect();
   try {
@@ -26,7 +26,8 @@ export async function GET(
       );
     }
 
-    const codeId = parseInt(params.id);
+    const resolvedParams = await params;
+    const codeId = parseInt(resolvedParams.id);
 
     // 查询激活码详情（关联机器人和用户信息）
     const result = await client.query(
@@ -73,7 +74,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const client = await pool.connect();
   try {
@@ -87,7 +88,8 @@ export async function PUT(
       );
     }
 
-    const codeId = parseInt(params.id);
+    const resolvedParams = await params;
+    const codeId = parseInt(resolvedParams.id);
     const body = await request.json();
 
     // 验证激活码是否存在
@@ -184,7 +186,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const client = await pool.connect();
   try {
@@ -198,7 +200,8 @@ export async function DELETE(
       );
     }
 
-    const codeId = parseInt(params.id);
+    const resolvedParams = await params;
+    const codeId = parseInt(resolvedParams.id);
 
     // 验证激活码是否存在（同时查询设备信息）
     const existingCode = await client.query(

@@ -21,10 +21,11 @@ import {
   Search,
   Wifi,
   WifiOff,
+  FileText,
 } from 'lucide-react';
 
 // 日志级别
-export enum LogLevel {
+enum LogLevel {
   VERBOSE = 0,
   DEBUG = 1,
   INFO = 2,

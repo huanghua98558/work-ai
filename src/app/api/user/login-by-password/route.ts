@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { pool } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
@@ -69,14 +69,22 @@ export async function POST(request: NextRequest) {
       await client.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
       // 生成 JWT Token
+      const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+      if (!jwtSecret) {
+        return NextResponse.json(
+          { success: false, error: '服务器配置错误' },
+          { status: 500 }
+        );
+      }
+
       const token = jwt.sign(
         {
           userId: user.id,
           phone: user.phone,
           role: user.role,
         },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '30d' }
+        jwtSecret,
+        { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '30d' } as SignOptions
       );
 
       // 返回用户信息和 Token

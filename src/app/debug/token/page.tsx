@@ -52,7 +52,7 @@ export default function DebugTokenPage() {
       setValid(true);
     } catch (error) {
       console.error('解析 Token 失败:', error);
-      setTokenInfo({ exists: true, valid: false, error: error.message });
+      setTokenInfo({ exists: true, valid: false, error: error instanceof Error ? error.message : String(error) });
       setValid(false);
     } finally {
       setLoading(false);

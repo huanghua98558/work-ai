@@ -20,6 +20,12 @@ export async function POST(request: NextRequest) {
 
     // 获取数据库实例
     const db = await getDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: "数据库连接失败" },
+        { status: 500 }
+      );
+    }
 
     // 检查用户是否已存在
     const existingUserResult = await db.execute(sql`
@@ -47,9 +53,9 @@ export async function POST(request: NextRequest) {
 
     // 生成 JWT Token
     const payload: JWTPayload = {
-      userId: newUser.id,
-      phone: newUser.phone,
-      role: newUser.role,
+      userId: newUser.id as number,
+      phone: newUser.phone as string,
+      role: newUser.role as string,
     };
 
     const accessToken = generateAccessToken(payload);

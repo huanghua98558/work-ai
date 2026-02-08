@@ -47,7 +47,7 @@ export default function DebugPermissionsPage() {
       try {
         const tokenPayload = JSON.parse(atob(token.split('.')[1]));
         console.log('Token 内容:', tokenPayload);
-        setUserInfo(prev => ({ ...prev, tokenPayload }));
+        setUserInfo((prev: any) => ({ ...prev, tokenPayload }));
       } catch (error) {
         console.error('解析 token 失败:', error);
       }

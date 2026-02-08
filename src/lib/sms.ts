@@ -96,7 +96,7 @@ export async function checkRateLimit(phone: string, seconds: number = SMS_CODE_R
         AND created_at > ${thresholdTime}
     `);
 
-    const count = parseInt(result.rows[0].count);
+    const count = parseInt(result.rows[0].count as string);
     console.log(`[RateLimit] Phone: ${phone}, Count: ${count}, Threshold: ${thresholdTime}`);
     return count === 0;
   } catch (error) {

@@ -34,6 +34,13 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 
 interface KnowledgeBase {
@@ -77,20 +84,15 @@ export default function KnowledgePage() {
   const loadKnowledgeBases = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/knowledge-bases', {
-        params: {
-          page,
-          limit: 20,
-        },
-      });
+      const response = await apiClient.get(`/api/knowledge-bases?page=${page}&limit=20`);
 
-      if (response.success) {
-        setKnowledgeBases(response.data);
-        setTotal(response.pagination.total);
+      if (response.data.success) {
+        setKnowledgeBases(response.data.data);
+        setTotal(response.data.pagination.total);
       } else {
         toast({
           title: "加载失败",
-          description: response.error || "加载知识库列表失败",
+          description: response.data.error || "加载知识库列表失败",
           variant: "destructive",
         });
       }
@@ -124,7 +126,7 @@ export default function KnowledgePage() {
       setCreating(true);
       const response = await apiClient.post('/api/knowledge-bases', createKbForm);
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "创建成功",
           description: "知识库创建成功",
@@ -140,7 +142,7 @@ export default function KnowledgePage() {
       } else {
         toast({
           title: "创建失败",
-          description: response.error || "创建知识库失败",
+          description: response.data.error || "创建知识库失败",
           variant: "destructive",
         });
       }
@@ -163,7 +165,7 @@ export default function KnowledgePage() {
       setSaving(true);
       const response = await apiClient.put(`/api/knowledge-bases/${editingKb.id}`, editKbForm);
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "更新成功",
           description: "知识库更新成功",
@@ -174,7 +176,7 @@ export default function KnowledgePage() {
       } else {
         toast({
           title: "更新失败",
-          description: response.error || "更新知识库失败",
+          description: response.data.error || "更新知识库失败",
           variant: "destructive",
         });
       }
@@ -198,7 +200,7 @@ export default function KnowledgePage() {
     try {
       const response = await apiClient.delete(`/api/knowledge-bases/${kbId}`);
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "删除成功",
           description: "知识库删除成功",
@@ -207,7 +209,7 @@ export default function KnowledgePage() {
       } else {
         toast({
           title: "删除失败",
-          description: response.error || "删除知识库失败",
+          description: response.data.error || "删除知识库失败",
           variant: "destructive",
         });
       }
@@ -342,7 +344,7 @@ export default function KnowledgePage() {
               </div>
             ) : knowledgeBases.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
-                暂无知识库，点击"创建知识库"开始使用
+                暂无知识库，点击&quot;创建知识库&quot;开始使用
               </div>
             ) : (
               <div className="space-y-4">

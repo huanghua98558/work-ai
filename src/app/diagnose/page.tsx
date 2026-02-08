@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 interface Diagnostics {
   timestamp: string;
@@ -139,12 +140,12 @@ export default function DiagnosePage() {
 
         {/* 返回链接 */}
         <div className="text-center">
-          <a
+          <Link
             href="/"
             className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             返回首页
-          </a>
+          </Link>
         </div>
       </div>
     </div>

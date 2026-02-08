@@ -31,10 +31,6 @@ function initializeDatabase() {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000, // 增加到15秒，适应部署环境
       query_timeout: 30000, // 查询超时30秒
-      retry: {
-        retries: 3, // 重试3次
-        delay: 1000, // 重试间隔1秒
-      },
     });
 
     _db = drizzle(_pool, { schema });
@@ -44,8 +40,13 @@ function initializeDatabase() {
 }
 
 // 获取数据库连接（异步，兼容现有代码）
-export async function getDatabase() {
+export async function getDatabase(): Promise<ReturnType<typeof drizzle>> {
   const { db: database, pool } = initializeDatabase();
+
+  // 确保 database 不为 null
+  if (!database) {
+    throw new Error('数据库连接未初始化');
+  }
 
   // 添加连接健康检查
   try {
@@ -87,6 +88,9 @@ export const pool = new Proxy({} as Pool, {
 export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(_target, prop) {
     const { db: database } = initializeDatabase();
+    if (!database) {
+      throw new Error('数据库连接未初始化');
+    }
     return database[prop as keyof typeof database];
   },
 });

@@ -87,6 +87,12 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: "数据库连接失败" },
+        { status: 500 }
+      );
+    }
 
     // 查找机器人
     const robotResult = await db.execute(sql`
@@ -140,6 +146,10 @@ export async function POST(request: NextRequest) {
  */
 async function handleMessageEvent(robotId: string, data: any) {
   const db = await getDatabase();
+  if (!db) {
+    console.error('数据库连接失败');
+    throw new Error('数据库连接失败');
+  }
 
   // 解析消息类型
   let messageType = MessageType.UNKNOWN;
@@ -253,6 +263,10 @@ async function handleMessageEvent(robotId: string, data: any) {
  */
 async function handleSystemEvent(robotId: string, type: string, data: any) {
   const db = await getDatabase();
+  if (!db) {
+    console.error('数据库连接失败');
+    throw new Error('数据库连接失败');
+  }
 
   // 插入系统消息记录
   const messageResult = await db.execute(sql`

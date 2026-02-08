@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -63,6 +63,7 @@ interface KnowledgeFile {
 
 export default function RobotConfigPage() {
   const router = useRouter();
+  const params = useParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,7 +82,7 @@ export default function RobotConfigPage() {
   const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]);
 
   // 获取robotId
-  const robotId = router.query?.id || typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('id') : '';
+  const robotId = params.id as string;
 
   useEffect(() => {
     if (!robotId) {

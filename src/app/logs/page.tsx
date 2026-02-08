@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 // 日志级别
-export enum LogLevel {
+enum LogLevel {
   VERBOSE = 0,
   DEBUG = 1,
   INFO = 2,
@@ -117,7 +117,7 @@ export default function LogsPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data: LogQueryResponse = await response.json();
+      const data = await response.json();
       if (data.success) {
         setLogs(data.data.logs);
         setTotal(parseInt(data.data.total));

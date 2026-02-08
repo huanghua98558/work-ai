@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         maxLogEntries: config[0].maxLogEntries,
         retentionDays: config[0].retentionDays,
         tags: config[0].tags ? JSON.parse(config[0].tags) : {},
-        updatedAt: Math.floor(new Date(config[0].updatedAt).getTime() / 1000),
+        updatedAt: config[0].updatedAt ? Math.floor(new Date(config[0].updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
       };
     } else {
       // 配置不存在，返回默认配置

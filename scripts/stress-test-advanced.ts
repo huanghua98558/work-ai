@@ -34,23 +34,23 @@ const colors = {
   cyan: '\x1b[36m',
 };
 
-function log(message, color = colors.reset) {
+function log(message: string, color = colors.reset) {
   console.log(`${color}${message}${colors.reset}`);
 }
 
-function logInfo(message) {
+function logInfo(message: string) {
   log(`[INFO] ${message}`, colors.blue);
 }
 
-function logSuccess(message) {
+function logSuccess(message: string) {
   log(`[SUCCESS] ${message}`, colors.green);
 }
 
-function logError(message) {
+function logError(message: string) {
   log(`[ERROR] ${message}`, colors.red);
 }
 
-function logWarning(message) {
+function logWarning(message: string) {
   log(`[WARNING] ${message}`, colors.yellow);
 }
 
@@ -62,14 +62,14 @@ const stats = {
   totalResponseTime: 0,
   minResponseTime: Infinity,
   maxResponseTime: 0,
-  statusCodes: {},
-  errors: [],
+  statusCodes: {} as Record<number, number>,
+  errors: [] as Array<{ error: string; responseTime: number }>,
   startTime: 0,
   endTime: 0,
 };
 
 // HTTP 请求函数
-function makeRequest(path, method = 'GET', data = null) {
+function makeRequest(path: string, method: string = 'GET', data: any = null): Promise<{ statusCode: number; responseTime: number; body: string } | { error: string; responseTime: number }> {
   return new Promise((resolve, reject) => {
     const url = new URL(path, config.baseUrl);
     const isHttps = url.protocol === 'https:';
@@ -83,11 +83,11 @@ function makeRequest(path, method = 'GET', data = null) {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'WorkBot-Stress-Test/1.0',
-      },
+      } as Record<string, string>,
     };
 
     if (data) {
-      options.headers['Content-Length'] = Buffer.byteLength(JSON.stringify(data));
+      options.headers['Content-Length'] = Buffer.byteLength(JSON.stringify(data)).toString();
     }
 
     const startTime = performance.now();
@@ -104,7 +104,7 @@ function makeRequest(path, method = 'GET', data = null) {
         const responseTime = endTime - startTime;
 
         const result = {
-          statusCode: res.statusCode,
+          statusCode: res.statusCode || 0,
           responseTime,
           body,
         };
@@ -132,7 +132,7 @@ function makeRequest(path, method = 'GET', data = null) {
 }
 
 // 更新统计
-function updateStats(result) {
+function updateStats(result: any) {
   stats.totalRequests++;
 
   if (result.statusCode && result.statusCode >= 200 && result.statusCode < 300) {
@@ -160,7 +160,7 @@ function updateStats(result) {
 }
 
 // 模拟用户行为
-async function simulateUser(userId) {
+async function simulateUser(userId: number) {
   const requests = [];
 
   // 用户请求序列
@@ -380,6 +380,9 @@ async function main() {
     // 检查服务是否可用
     logInfo('检查服务可用性...');
     const healthCheck = await makeRequest('/api/health/ready');
+    if ('error' in healthCheck) {
+      throw new Error(`服务不可用，错误: ${healthCheck.error}`);
+    }
     if (healthCheck.statusCode !== 200) {
       throw new Error(`服务不可用，状态码: ${healthCheck.statusCode}`);
     }
@@ -417,7 +420,7 @@ async function main() {
     console.log(report);
 
   } catch (error) {
-    logError(`测试失败: ${error.message}`);
+    logError(`测试失败: ${error instanceof Error ? error.message : String(error)}`);
     console.error(error);
     process.exit(1);
   }

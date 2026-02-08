@@ -248,7 +248,7 @@ export default function WebSocketTestPage() {
                 ))
               ) : (
                 <div className="text-sm text-gray-500 text-center py-8">
-                  点击"测试连接"开始测试
+                  点击&quot;测试连接&quot;开始测试
                 </div>
               )}
             </div>

@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       ${sql.raw(whereClause)}
     `);
 
-    const total = parseInt(countResult.rows[0].total);
+    const total = parseInt(countResult.rows[0].total as string);
 
     return NextResponse.json({
       success: true,

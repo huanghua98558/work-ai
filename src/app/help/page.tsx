@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function HelpPage() {
   const [activeTab, setActiveTab] = useState('method1');
@@ -74,8 +75,8 @@ export default function HelpPage() {
                   <ol className="list-decimal list-inside space-y-2 text-blue-800 dark:text-blue-200">
                     <li>打开扣子平台（https://coze.cn）</li>
                     <li>进入你的应用/智能体</li>
-                    <li>点击右上角的"设置"或"应用设置"按钮</li>
-                    <li>找到"环境变量"或"Secrets"选项卡</li>
+                    <li>点击右上角的&quot;设置&quot;或&quot;应用设置&quot;按钮</li>
+                    <li>找到&quot;环境变量&quot;或&quot;Secrets&quot;选项卡</li>
                     <li>添加以下环境变量</li>
                   </ol>
                 </div>
@@ -119,7 +120,7 @@ NODE_ENV=production`}
                   </h3>
                   <ol className="list-decimal list-inside space-y-2 text-green-800 dark:text-green-200">
                     <li>打开工作流编辑器</li>
-                    <li>点击顶部菜单的"设置"或"全局变量"</li>
+                    <li>点击顶部菜单的&quot;设置&quot;或&quot;全局变量&quot;</li>
                     <li>添加环境变量</li>
                     <li>保存并部署工作流</li>
                   </ol>
@@ -161,7 +162,7 @@ NODE_ENV=production`}
                   <ol className="list-decimal list-inside space-y-2 text-purple-800 dark:text-purple-200">
                     <li>访问扣子平台</li>
                     <li>进入项目配置管理</li>
-                    <li>查找"变量管理"或"环境变量管理"</li>
+                    <li>查找&quot;变量管理&quot;或&quot;环境变量管理&quot;</li>
                     <li>创建新变量，设置变量名和值</li>
                   </ol>
                 </div>
@@ -272,10 +273,10 @@ if (!jwtSecret) {
           <div className="space-y-4">
             <div className="border-l-4 border-blue-500 pl-4">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                Q: 找不到"环境变量"配置项怎么办？
+                Q: 找不到&quot;环境变量&quot;配置项怎么办？
               </h3>
               <p className="text-gray-600 dark:text-gray-400">
-                A: 查找"Secrets"、"变量管理"、"配置管理"或"应用设置"等类似选项卡。
+                A: 查找&quot;Secrets&quot;、&quot;变量管理&quot;、&quot;配置管理&quot;或&quot;应用设置&quot;等类似选项卡。
               </p>
             </div>
 
@@ -310,12 +311,12 @@ if (!jwtSecret) {
 
         {/* 返回链接 */}
         <div className="text-center">
-          <a
+          <Link
             href="/"
             className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             返回首页
-          </a>
+          </Link>
         </div>
       </div>
     </div>
