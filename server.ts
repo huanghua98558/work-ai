@@ -2,7 +2,7 @@ import { config } from 'dotenv';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
-import { initializeWebSocketServer } from './src/server/websocket-server';
+import { initializeWebSocketServer } from './src/server/websocket-server-v3';
 import { cleanupZombieProcesses, getSystemStats } from './src/lib/process-cleanup';
 
 // 首先加载环境变量
