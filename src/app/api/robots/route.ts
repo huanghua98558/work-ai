@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { z } from "zod";
 
@@ -31,7 +31,8 @@ const bindRobotSchema = z.object({
  * GET /api/robots
  */
 export async function GET(request: NextRequest) {
-  const client = await pool.connect();
+  const poolInstance = await getPool();
+  const client = await poolInstance.connect();
   try {
     const user = requireAuth(request);
 

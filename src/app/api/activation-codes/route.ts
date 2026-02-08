@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { requireAuth, isAdmin } from "@/lib/auth";
 import { z } from "zod";
 import { randomBytes } from "crypto";
@@ -50,7 +50,8 @@ function generateBotId(): string {
  * GET /api/activation-codes
  */
 export async function GET(request: NextRequest) {
-  const client = await pool.connect();
+  const poolInstance = await getPool();
+  const client = await poolInstance.connect();
   try {
     const user = requireAuth(request);
 
@@ -163,7 +164,8 @@ export async function GET(request: NextRequest) {
  * 返回：激活码 + 机器人ID
  */
 export async function POST(request: NextRequest) {
-  const client = await pool.connect();
+  const poolInstance = await getPool();
+  const client = await poolInstance.connect();
   try {
     const user = requireAuth(request);
 
