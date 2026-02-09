@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { getPool } from '@/lib/db';
+import { generateAccessToken, generateRefreshToken } from '@/lib/jwt';
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,30 +70,26 @@ export async function POST(request: NextRequest) {
       // 更新最后登录时间
       await client.query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
-      // 生成 JWT Token
-      const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
-      if (!jwtSecret) {
-        return NextResponse.json(
-          { success: false, error: '服务器配置错误' },
-          { status: 500 }
-        );
-      }
+      // 生成 Access Token 和 Refresh Token
+      const accessToken = generateAccessToken({
+        userId: user.id,
+        phone: user.phone,
+        role: user.role,
+      });
 
-      const token = jwt.sign(
-        {
-          userId: user.id,
-          phone: user.phone,
-          role: user.role,
-        },
-        jwtSecret,
-        { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '30d' } as SignOptions
-      );
+      const refreshToken = generateRefreshToken({
+        userId: user.id,
+        phone: user.phone,
+        role: user.role,
+      });
 
       // 返回用户信息和 Token
       const response = NextResponse.json({
         success: true,
         data: {
-          token,
+          accessToken,
+          refreshToken,
+          token: accessToken, // 兼容旧代码
           user: {
             id: user.id,
             phone: user.phone,
@@ -105,12 +102,20 @@ export async function POST(request: NextRequest) {
       });
 
       // 设置 Cookie
-      response.cookies.set('accessToken', token, {
+      response.cookies.set('accessToken', accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
         maxAge: 30 * 24 * 60 * 60, // 30 天
+      });
+
+      response.cookies.set('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 90 * 24 * 60 * 60, // 90 天
       });
 
       return response;

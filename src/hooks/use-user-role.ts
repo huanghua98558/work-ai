@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { verifyToken } from '@/lib/jwt';
+import { getAuthHeaders as getAuthHeadersFromAuth } from './use-auth';
 
 export interface UserRole {
   userId: number;
@@ -12,7 +13,7 @@ export function useUserRole() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     if (!token) {
       setLoading(false);
       return;
@@ -40,8 +41,5 @@ export function useUserRole() {
   };
 }
 
-// 用于在 fetch 请求中添加 token 的辅助函数
-export function getAuthHeaders() {
-  const token = localStorage.getItem('token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
+// 重新导出，保持向后兼容
+export const getAuthHeaders = getAuthHeadersFromAuth;

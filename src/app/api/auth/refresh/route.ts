@@ -1,134 +1,143 @@
-// 强制动态渲染，避免构建时执行
+// 强制动态渲染
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
-import { z } from "zod";
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken, generateAccessToken, generateRefreshToken } from '@/lib/jwt';
+import { getPool } from '@/lib/db';
 
 /**
- * Token刷新验证 Schema
- */
-const refreshSchema = z.object({
-  refreshToken: z.string().min(1),
-});
-
-/**
- * 生成随机token
- */
-function generateToken(length: number = 64): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-/**
- * Token刷新接口
+ * 刷新 Token
  * POST /api/auth/refresh
- *
- * 流程：
- * 1. 验证refreshToken
- * 2. 生成新的accessToken和refreshToken
- * 3. 更新device_tokens表
- * 4. 返回新的token
+ * Body: { refreshToken }
  */
 export async function POST(request: NextRequest) {
-  const client = await pool.connect();
   try {
     const body = await request.json();
-    const validatedData = refreshSchema.parse(body);
+    const { refreshToken } = body;
 
-    console.log('Token刷新请求:', { refreshToken: validatedData.refreshToken.substring(0, 10) + '...' });
-
-    // 查找refreshToken对应的记录
-    const tokenResult = await client.query(
-      `SELECT * FROM device_tokens WHERE refresh_token = $1`,
-      [validatedData.refreshToken]
-    );
-
-    if (tokenResult.rows.length === 0) {
+    if (!refreshToken) {
       return NextResponse.json(
-        { code: 401, message: "RefreshToken无效", data: null },
-        { status: 401 }
-      );
-    }
-
-    const tokenRecord = tokenResult.rows[0];
-
-    // 检查token是否过期
-    if (new Date() > new Date(tokenRecord.expires_at)) {
-      // 删除过期的token
-      await client.query(
-        `DELETE FROM device_tokens WHERE id = $1`,
-        [tokenRecord.id]
-      );
-      return NextResponse.json(
-        { code: 401, message: "Token已过期，请重新激活", data: null },
-        { status: 401 }
-      );
-    }
-
-    // 生成新的token
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24小时后过期
-    const newAccessToken = generateToken();
-    const newRefreshToken = generateToken();
-
-    // 更新token记录
-    await client.query(
-      `UPDATE device_tokens
-       SET access_token = $1,
-           refresh_token = $2,
-           expires_at = $3,
-           created_at = $4
-       WHERE id = $5`,
-      [newAccessToken, newRefreshToken, expiresAt.toISOString(), now.toISOString(), tokenRecord.id]
-    );
-
-    // 查询机器人信息
-    const robotResult = await client.query(
-      `SELECT bot_id FROM robots WHERE bot_id = $1`,
-      [tokenRecord.robot_id]
-    );
-
-    if (robotResult.rows.length === 0) {
-      return NextResponse.json(
-        { code: 404, message: "机器人不存在", data: null },
-        { status: 404 }
-      );
-    }
-
-    const robot = robotResult.rows[0];
-
-    return NextResponse.json({
-      code: 200,
-      message: "刷新成功",
-      data: {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-        expiresIn: 86400,
-        tokenType: "Bearer",
-        expiresAt: expiresAt.toISOString(),
-        robotId: robot.bot_id,
-      },
-    });
-  } catch (error: any) {
-    console.error("Token刷新错误:", error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { code: 400, message: "请求参数错误", data: null },
+        {
+          success: false,
+          error: 'Refresh Token 不能为空',
+          code: 'REFRESH_TOKEN_REQUIRED',
+        },
         { status: 400 }
       );
     }
 
+    console.log('[AuthRefresh] 收到刷新 Token 请求');
+
+    // 验证 Refresh Token
+    const decoded = verifyToken(refreshToken);
+    if (!decoded) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Refresh Token 无效或已过期',
+          code: 'INVALID_REFRESH_TOKEN',
+        },
+        { status: 401 }
+      );
+    }
+
+    console.log('[AuthRefresh] Refresh Token 验证成功:', {
+      userId: decoded.userId,
+      phone: decoded.phone,
+      role: decoded.role,
+    });
+
+    // 检查用户是否仍然有效
+    const poolInstance = await getPool();
+    const client = await poolInstance.connect();
+
+    try {
+      const userResult = await client.query(
+        'SELECT id, phone, nickname, role, status FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (!userResult.rows.length) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: '用户不存在',
+            code: 'USER_NOT_FOUND',
+          },
+          { status: 404 }
+        );
+      }
+
+      const user = userResult.rows[0];
+
+      if (user.status !== 'active') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: '用户已被禁用',
+            code: 'USER_DISABLED',
+          },
+          { status: 403 }
+        );
+      }
+
+      // 生成新的 Access Token 和 Refresh Token
+      const newAccessToken = generateAccessToken({
+        userId: user.id,
+        phone: user.phone,
+        role: user.role,
+      });
+
+      const newRefreshToken = generateRefreshToken({
+        userId: user.id,
+        phone: user.phone,
+        role: user.role,
+      });
+
+      console.log('[AuthRefresh] Token 刷新成功:', {
+        userId: user.id,
+        phone: user.phone,
+        role: user.role,
+      });
+
+      // 返回新的 Token
+      const response = NextResponse.json({
+        success: true,
+        data: {
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+          user: {
+            id: user.id,
+            phone: user.phone,
+            nickname: user.nickname,
+            role: user.role,
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      // 设置新的 Cookie
+      response.cookies.set('accessToken', newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 30 * 24 * 60 * 60, // 30 天
+      });
+
+      return response;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error('[AuthRefresh] Token 刷新失败:', error);
     return NextResponse.json(
-      { code: 500, message: "Token刷新失败", data: null },
+      {
+        success: false,
+        error: error.message || 'Token 刷新失败',
+        code: 'REFRESH_FAILED',
+      },
       { status: 500 }
     );
-  } finally {
-    client.release();
   }
 }

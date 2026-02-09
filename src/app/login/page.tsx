@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { saveAuthData } from '@/hooks/use-auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,9 +31,8 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (data.success) {
-        // 保存 token 到 localStorage
-        localStorage.setItem('token', data.data.token)
-        localStorage.setItem('user', JSON.stringify(data.data.user))
+        // 使用新的 saveAuthData 保存 Token
+        saveAuthData(data.data)
         // 跳转到首页或控制台
         router.push('/dashboard')
       } else {
