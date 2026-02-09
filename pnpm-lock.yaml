@@ -120,9 +120,6 @@ importers:
       autoprefixer:
         specifier: ^10.4.17
         version: 10.4.24(postcss@8.5.6)
-      dotenv:
-        specifier: ^17.2.4
-        version: 17.2.4
       drizzle-kit:
         specifier: ^0.31.8
         version: 0.31.8
@@ -1889,10 +1886,6 @@ packages:
   doctrine@3.0.0:
     resolution: {integrity: sha512-yS+Q5i3hBf7GBkd4KG8a7eBNNWNGLTaEwwYWUijIYM7zrlYDM0BFXHjjPWlWZ1Rg7UaddZeIDmi9jF3HmqiQ2w==}
     engines: {node: '>=6.0.0'}
-
-  dotenv@17.2.4:
-    resolution: {integrity: sha512-mudtfb4zRB4bVvdj0xRo+e6duH1csJRM8IukBqfTRvHotn9+LBXB8ynAidP9zHqoRC/fsllXgk4kCKlR21fIhw==}
-    engines: {node: '>=12'}
 
   drizzle-kit@0.31.8:
     resolution: {integrity: sha512-O9EC/miwdnRDY10qRxM8P3Pg8hXe3LyU4ZipReKOgTwn4OqANmftj8XJz1UPUAS6NMHf0E2htjsbQujUTkncCg==}
@@ -4962,8 +4955,6 @@ snapshots:
   doctrine@3.0.0:
     dependencies:
       esutils: 2.0.3
-
-  dotenv@17.2.4: {}
 
   drizzle-kit@0.31.8:
     dependencies:
