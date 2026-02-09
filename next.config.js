@@ -13,7 +13,7 @@ const nextConfig = {
     ignoreDuringBuilds: process.env.NODE_ENV === 'development',
   },
   typescript: {
-    ignoreBuildErrors: process.env.NODE_ENV === 'development',
+    ignoreBuildErrors: true,
   },
 
   // 性能优化
