@@ -6,11 +6,5 @@ build = ["pnpm", "install"]
 run = ["pnpm", "run", "dev"]
 
 [deploy]
-build = ["bash", "-c", "pnpm install && pnpm run build"]
-run = ["node", ".next/standalone/server.js"]
-
-[env]
-NODE_ENV=production
-NEXT_TYPESCRIPT_SKIP_TYPE_CHECK=true
-NEXT_TYPESCRIPT_IGNORE_BUILD_ERRORS=true
-NEXT_DISABLE_ESLINT=true
+build = ["pnpm", "run", "build"]
+run = ["pnpm", "run", "start"]
