@@ -83,14 +83,75 @@ class TokenManager {
   }
 
   /**
-   * 检查 Token 是否即将过期（5分钟内）
+   * 检查 Token 是否即将过期
+   * 根据不同 Token 有效期，提前刷新时间不同：
+   * - 短期 Token（< 2小时）：提前 10 分钟
+   * - 中期 Token（2小时 - 7天）：提前 2 小时
+   * - 长期 Token（7天 - 30天）：提前 1 天
+   * - 超长期 Token（> 30天）：提前 3 天
    */
-  static isTokenExpiringSoon(): boolean {
+  static isTokenExpiringSoon(thresholdMs?: number): boolean {
     const tokens = this.getTokens();
     if (!tokens) return false;
 
     const expiresIn = tokens.expiresAt - Date.now();
-    return expiresIn < 5 * 60 * 1000; // 5分钟内
+
+    // 如果用户指定了阈值，使用用户指定的值
+    if (thresholdMs !== undefined) {
+      return expiresIn < thresholdMs;
+    }
+
+    // 否则根据 Token 有效期自动计算
+    const totalValidity = tokens.expiresAt - (Date.now() - expiresIn);
+
+    // 短期 Token（< 2小时）：提前 10 分钟
+    if (totalValidity < 2 * 60 * 60 * 1000) {
+      return expiresIn < 10 * 60 * 1000;
+    }
+
+    // 中期 Token（2小时 - 7天）：提前 2 小时
+    if (totalValidity < 7 * 24 * 60 * 60 * 1000) {
+      return expiresIn < 2 * 60 * 60 * 1000;
+    }
+
+    // 长期 Token（7天 - 30天）：提前 1 天
+    if (totalValidity < 30 * 24 * 60 * 60 * 1000) {
+      return expiresIn < 24 * 60 * 60 * 1000;
+    }
+
+    // 超长期 Token（> 30天）：提前 3 天
+    return expiresIn < 3 * 24 * 60 * 60 * 1000;
+  }
+
+  /**
+   * 获取 Token 剩余有效时间（毫秒）
+   */
+  static getExpiresIn(): number {
+    const tokens = this.getTokens();
+    if (!tokens) return 0;
+
+    const expiresIn = tokens.expiresAt - Date.now();
+    return Math.max(0, expiresIn);
+  }
+
+  /**
+   * 获取 Token 剩余有效时间（人类可读格式）
+   */
+  static getExpiresInHumanReadable(): string {
+    const expiresIn = this.getExpiresIn();
+
+    if (expiresIn <= 0) return '已过期';
+
+    const days = Math.floor(expiresIn / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((expiresIn % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((expiresIn % (60 * 60 * 1000)) / (60 * 1000));
+
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days}天`);
+    if (hours > 0) parts.push(`${hours}小时`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}分钟`);
+
+    return parts.join(' ');
   }
 
   /**
