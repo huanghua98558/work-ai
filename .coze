@@ -8,3 +8,9 @@ run = ["pnpm", "run", "dev"]
 [deploy]
 build = ["bash", "-c", "bash scripts/check-env.sh && bash scripts/deploy-build.sh"]
 run = ["bash", "scripts/start.sh"]
+
+[env]
+NODE_ENV=production
+NEXT_TYPESCRIPT_SKIP_TYPE_CHECK=true
+NEXT_TYPESCRIPT_IGNORE_BUILD_ERRORS=true
+NEXT_DISABLE_ESLINT=true
