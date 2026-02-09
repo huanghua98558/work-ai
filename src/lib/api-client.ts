@@ -8,15 +8,55 @@ export interface ApiResponse<T = any> {
   timestamp?: string;
 }
 
+// 客户端检查
+const isClient = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+
 /**
  * 统一的 API 客户端
  * 自动添加 Authorization header
  */
 export class ApiClient {
   private baseUrl: string;
+  private token: string | null = null;
 
   constructor(baseUrl: string = '') {
     this.baseUrl = baseUrl;
+    // 只在客户端初始化 Token
+    if (isClient) {
+      try {
+        this.token = localStorage.getItem('accessToken') || localStorage.getItem('token') || null;
+      } catch (error) {
+        console.error('[ApiClient] 初始化 Token 失败:', error);
+      }
+    }
+  }
+
+  setToken(token: string) {
+    this.token = token;
+    if (isClient) {
+      try {
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('token', token);
+      } catch (error) {
+        console.error('[ApiClient] 保存 Token 失败:', error);
+      }
+    }
+  }
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  removeToken() {
+    this.token = null;
+    if (isClient) {
+      try {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+      } catch (error) {
+        console.error('[ApiClient] 清除 Token 失败:', error);
+      }
+    }
   }
 
   private async request<T>(
@@ -26,11 +66,21 @@ export class ApiClient {
     const url = `${this.baseUrl}${endpoint}`;
 
     // 合并认证头
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...options.headers,
     };
+
+    // 只在客户端添加认证头
+    if (isClient) {
+      try {
+        const authHeaders = getAuthHeaders();
+        Object.assign(headers, authHeaders);
+      } catch (error) {
+        console.error('[ApiClient] 获取认证头失败:', error);
+      }
+    }
+
+    Object.assign(headers, options.headers);
 
     try {
       const response = await fetch(url, {
@@ -44,10 +94,14 @@ export class ApiClient {
         // 处理特定的错误状态码
         if (response.status === 401) {
           // 未授权，清除本地存储并跳转到登录页
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            try {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            } catch (error) {
+              console.error('[ApiClient] 清除本地存储失败:', error);
+            }
           }
           return {
             success: false,

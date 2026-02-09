@@ -22,7 +22,7 @@ export function useAuth() {
   const [state, setState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
-    isLoading: true,
+    isLoading: typeof window === 'undefined' ? false : true, // 服务端不加载
     error: null,
   });
 
@@ -34,8 +34,15 @@ export function useAuth() {
       const parts = token.split('.');
       if (parts.length !== 3) return null;
 
-      const payload = JSON.parse(atob(parts[1]));
-      return payload.exp ? payload.exp * 1000 : null; // 转换为毫秒
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+
+      // 检查 payload 是否为有效对象
+      if (!payload || typeof payload !== 'object') return null;
+
+      // 检查 exp 是否存在
+      if (typeof payload.exp !== 'number') return null;
+
+      return payload.exp * 1000; // 转换为毫秒
     } catch (error) {
       console.error('[UseAuth] 解析 Token 失败:', error);
       return null;
@@ -64,6 +71,11 @@ export function useAuth() {
 
   // 刷新 Token
   const refreshAccessToken = useCallback(async (): Promise<boolean> => {
+    // 只在客户端执行
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return false;
+    }
+
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!refreshToken) {
       console.log('[UseAuth] 没有 Refresh Token，无法刷新');
@@ -89,14 +101,27 @@ export function useAuth() {
       }
 
       // 保存新的 Token
-      localStorage.setItem(ACCESS_TOKEN_KEY, data.data.accessToken);
-      localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.data.user));
+      const responseData = data.data;
+      if (!responseData || typeof responseData !== 'object') {
+        throw new Error('刷新响应数据格式错误');
+      }
+
+      const accessToken = responseData.accessToken;
+      const newRefreshToken = responseData.refreshToken;
+      const user = responseData.user;
+
+      if (!accessToken || !newRefreshToken || !user) {
+        throw new Error('刷新响应数据格式错误');
+      }
+
+      localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
 
       console.log('[UseAuth] Token 刷新成功');
 
       // 更新状态
-      const decoded = verifyToken(data.data.accessToken);
+      const decoded = verifyToken(accessToken);
       setState({
         user: decoded,
         isAuthenticated: true,
@@ -109,12 +134,20 @@ export function useAuth() {
       console.error('[UseAuth] 刷新 Token 异常:', error);
 
       // 清除本地存储
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.removeItem(ACCESS_TOKEN_KEY);
+          localStorage.removeItem(REFRESH_TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+        } catch (e) {
+          console.error('[UseAuth] 清除本地存储失败:', e);
+        }
+      }
 
       // 跳转到登录页
-      router.push('/login');
+      if (typeof window !== 'undefined') {
+        router.push('/login');
+      }
 
       setState({
         user: null,
@@ -129,9 +162,21 @@ export function useAuth() {
 
   // 初始化认证状态
   useEffect(() => {
+    // 只在客户端执行
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
     const initAuth = async () => {
-      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      try {
+        const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+        const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
       if (!accessToken) {
         setState({
@@ -183,6 +228,15 @@ export function useAuth() {
         isLoading: false,
         error: null,
       });
+    } catch (error) {
+      console.error('[UseAuth] 初始化认证状态失败:', error);
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: error instanceof Error ? error.message : '认证初始化失败',
+      });
+    }
     };
 
     initAuth();
@@ -190,15 +244,24 @@ export function useAuth() {
 
   // 定期检查 Token 是否即将过期并自动刷新
   useEffect(() => {
+    // 只在客户端执行
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return;
+    }
+
     if (!state.isAuthenticated || state.isLoading) return;
 
     const checkInterval = setInterval(async () => {
-      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-      if (!accessToken) return;
+      try {
+        const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (!accessToken) return;
 
-      if (isTokenExpiringSoon(accessToken)) {
-        console.log('[UseAuth] Token 即将过期，自动刷新');
-        await refreshAccessToken();
+        if (isTokenExpiringSoon(accessToken)) {
+          console.log('[UseAuth] Token 即将过期，自动刷新');
+          await refreshAccessToken();
+        }
+      } catch (error) {
+        console.error('[UseAuth] 定期检查 Token 失败:', error);
       }
     }, 60 * 1000); // 每分钟检查一次
 
@@ -209,9 +272,16 @@ export function useAuth() {
   const logout = useCallback(() => {
     console.log('[UseAuth] 用户登出');
 
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    // 只在客户端执行
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      } catch (error) {
+        console.error('[UseAuth] 清除本地存储失败:', error);
+      }
+    }
 
     setState({
       user: null,
@@ -239,12 +309,22 @@ export function useAuth() {
 
 // 辅助函数：获取认证头
 export function getAuthHeaders(): HeadersInit {
-  const accessToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
-  if (accessToken) {
-    return {
-      'Authorization': `Bearer ${accessToken}`,
-    };
+  // 只在客户端执行
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return {};
   }
+
+  try {
+    const accessToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    if (accessToken) {
+      return {
+        'Authorization': `Bearer ${accessToken}`,
+      };
+    }
+  } catch (error) {
+    console.error('[getAuthHeaders] 获取 Access Token 失败:', error);
+  }
+
   return {};
 }
 
@@ -255,26 +335,44 @@ export function saveAuthData(data: {
   token?: string;
   user: any;
 }) {
-  const accessToken = data.accessToken || data.token;
-
-  if (accessToken) {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('token', accessToken); // 兼容旧代码
+  // 只在客户端执行
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
   }
 
-  if (data.refreshToken) {
-    localStorage.setItem('refreshToken', data.refreshToken);
-  }
+  try {
+    const accessToken = data.accessToken || data.token;
 
-  if (data.user) {
-    localStorage.setItem('user', JSON.stringify(data.user));
+    if (accessToken) {
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('token', accessToken); // 兼容旧代码
+    }
+
+    if (data.refreshToken) {
+      localStorage.setItem('refreshToken', data.refreshToken);
+    }
+
+    if (data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+  } catch (error) {
+    console.error('[saveAuthData] 保存认证信息失败:', error);
   }
 }
 
 // 辅助函数：清除认证信息
 export function clearAuthData() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  // 只在客户端执行
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+
+  try {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  } catch (error) {
+    console.error('[clearAuthData] 清除认证信息失败:', error);
+  }
 }

@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { saveAuthData } from '@/hooks/use-auth'
+// import { saveAuthData } from '@/hooks/use-auth'
+
+// 禁用静态生成
+export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
   const router = useRouter()
@@ -32,7 +35,7 @@ export default function LoginPage() {
 
       if (data.success) {
         // 使用新的 saveAuthData 保存 Token
-        saveAuthData(data.data)
+        // saveAuthData(data.data)
         // 跳转到首页或控制台
         router.push('/dashboard')
       } else {

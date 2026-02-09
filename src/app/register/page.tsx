@@ -10,6 +10,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { authService } from '@/lib/auth-service';
 
+// 禁用静态生成
+export const dynamic = 'force-dynamic';
+
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
