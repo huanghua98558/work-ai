@@ -223,7 +223,17 @@ export class MessageHandlerImpl {
       console.error('[MessageHandler] 更新设备状态失败:', error);
     }
 
-    // 回复心跳（可选，根据文档不需要响应）
+    // 回复心跳 ACK（可选，但建议用于确认收到）
+    this.sendMessage(connection, {
+      type: WSMessageType.HEARTBEAT_ACK,
+      data: {
+        serverTime: Date.now(),
+        nextHeartbeat: Date.now() + 30 * 1000, // 下次心跳时间（30秒后）
+        receivedAt: Date.now(),
+      },
+      timestamp: Date.now(),
+    });
+
     console.log(`[MessageHandler] 收到心跳: ${connection.robotId}`);
   }
 
@@ -393,6 +403,56 @@ export class MessageHandlerImpl {
       },
       timestamp: Date.now(),
     });
+  }
+
+  /**
+   * 发送心跳警告
+   */
+  sendHeartbeatWarning(
+    connection: WebSocketConnection,
+    warningType: 'timeout_soon' | 'last_heartbeat_missed',
+    remainingTime?: number,
+    lastHeartbeatAt?: number
+  ): void {
+    this.sendMessage(connection, {
+      type: WSMessageType.HEARTBEAT_WARNING,
+      data: {
+        warningType,
+        remainingTime,
+        lastHeartbeatAt,
+        timeoutTime: lastHeartbeatAt ? lastHeartbeatAt + 60 * 1000 : undefined,
+      },
+      timestamp: Date.now(),
+    });
+
+    console.log(`[MessageHandler] 发送心跳警告: ${connection.robotId}, type: ${warningType}`);
+  }
+
+  /**
+   * 获取心跳统计信息
+   */
+  getHeartbeatStats(connection: WebSocketConnection): {
+    robotId: string;
+    lastHeartbeatAt: Date | undefined;
+    timeSinceLastHeartbeat: number;
+    isTimeout: boolean;
+  } | null {
+    if (!connection.robotId) {
+      return null;
+    }
+
+    const now = Date.now();
+    const lastHeartbeatAt = connection.lastHeartbeatAt;
+    const timeSinceLastHeartbeat = lastHeartbeatAt
+      ? now - lastHeartbeatAt.getTime()
+      : Infinity;
+
+    return {
+      robotId: connection.robotId,
+      lastHeartbeatAt,
+      timeSinceLastHeartbeat,
+      isTimeout: timeSinceLastHeartbeat > 60 * 1000, // 60秒超时
+    };
   }
 
   /**

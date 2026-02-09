@@ -145,6 +145,7 @@ class ConnectionManagerImpl implements ConnectionManager {
   cleanupTimeoutConnections(timeoutMs: number = 60 * 1000): void {
     const now = Date.now();
     const toRemove: WebSocket[] = [];
+    const timeoutInfo: Array<{ robotId: string; elapsed: number }> = [];
 
     for (const [ws, connection] of this.connections.entries()) {
       if (!connection.lastHeartbeatAt) {
@@ -153,20 +154,85 @@ class ConnectionManagerImpl implements ConnectionManager {
 
       const elapsed = now - connection.lastHeartbeatAt.getTime();
       if (elapsed > timeoutMs) {
-        console.log(`[ConnectionManager] 发现超时连接: ${connection.robotId}, 超时时间: ${elapsed}ms`);
+        console.log(
+          `[ConnectionManager] 发现超时连接: ${connection.robotId}, 超时时间: ${Math.round(elapsed / 1000)}秒`
+        );
         toRemove.push(ws);
+        timeoutInfo.push({
+          robotId: connection.robotId || 'unknown',
+          elapsed,
+        });
       }
     }
 
+    // 关闭超时连接
     toRemove.forEach(ws => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close(1000, 'Connection timeout');
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close(1000, 'Connection timeout');
+        }
+      } catch (error) {
+        console.error('[ConnectionManager] 关闭超时连接失败:', error);
       }
     });
 
+    // 记录清理日志
     if (toRemove.length > 0) {
-      console.log(`[ConnectionManager] 清理了 ${toRemove.length} 个超时连接`);
+      const totalTimeout = timeoutInfo.reduce((sum, info) => sum + info.elapsed, 0);
+      const avgTimeout = totalTimeout / timeoutInfo.length;
+
+      console.log(
+        `[ConnectionManager] 清理了 ${toRemove.length} 个超时连接, ` +
+          `平均超时时间: ${Math.round(avgTimeout / 1000)}秒, ` +
+          `总连接数: ${this.connections.size}`
+      );
     }
+
+    return toRemove.length;
+  }
+
+  /**
+   * 获取心跳统计信息
+   */
+  getHeartbeatStats(): {
+    totalConnections: number;
+    authenticatedConnections: number;
+    activeConnections: number;
+    warningConnections: number;
+    timeoutConnections: number;
+  } {
+    const now = Date.now();
+    const connections = this.getAuthenticatedConnections();
+    const WARNING_THRESHOLD = 50 * 1000; // 50秒
+    const TIMEOUT_THRESHOLD = 60 * 1000; // 60秒
+
+    let activeConnections = 0;
+    let warningConnections = 0;
+    let timeoutConnections = 0;
+
+    for (const connection of connections) {
+      if (!connection.lastHeartbeatAt) {
+        continue;
+      }
+
+      const elapsed = now - connection.lastHeartbeatAt.getTime();
+
+      if (elapsed < WARNING_THRESHOLD) {
+        activeConnections++;
+      } else if (elapsed < TIMEOUT_THRESHOLD) {
+        warningConnections++;
+      } else {
+        timeoutConnections++;
+      }
+    }
+
+    return {
+      totalConnections: this.connections.size,
+      authenticatedConnections: connections.length,
+      activeConnections,
+      warningConnections,
+      timeoutConnections,
+    };
   }
 }
 

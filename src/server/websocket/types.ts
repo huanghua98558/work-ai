@@ -13,6 +13,8 @@ export enum WSMessageType {
 
   // 心跳相关
   HEARTBEAT = 'heartbeat',
+  HEARTBEAT_ACK = 'heartbeat_ack',
+  HEARTBEAT_WARNING = 'heartbeat_warning',
 
   // 指令相关
   COMMAND_PUSH = 'command_push',
@@ -161,6 +163,35 @@ export interface HeartbeatData {
 export interface HeartbeatMessage extends WSMessage {
   type: WSMessageType.HEARTBEAT;
   data: HeartbeatData;
+}
+
+/**
+ * 心跳确认消息数据
+ */
+export interface HeartbeatAckData {
+  serverTime: number;
+  nextHeartbeat: number;
+  receivedAt: number;
+}
+
+export interface HeartbeatAckMessage extends WSMessage {
+  type: WSMessageType.HEARTBEAT_ACK;
+  data: HeartbeatAckData;
+}
+
+/**
+ * 心跳警告消息数据
+ */
+export interface HeartbeatWarningData {
+  warningType: 'timeout_soon' | 'last_heartbeat_missed';
+  remainingTime?: number; // 剩余时间（毫秒）
+  lastHeartbeatAt?: number; // 最后心跳时间
+  timeoutTime?: number; // 超时时间
+}
+
+export interface HeartbeatWarningMessage extends WSMessage {
+  type: WSMessageType.HEARTBEAT_WARNING;
+  data: HeartbeatWarningData;
 }
 
 /**

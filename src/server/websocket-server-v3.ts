@@ -204,14 +204,92 @@ function startHeartbeatCheck() {
 
   console.log('[WebSocket v3.0] 启动心跳检测...');
 
+  // 警告阈值：50秒（提前10秒警告）
+  const WARNING_THRESHOLD = 50 * 1000;
+
   heartbeatTimer = setInterval(() => {
-    // 清理超时连接
-    connectionManager.cleanupTimeoutConnections(HEARTBEAT_TIMEOUT);
-
-    // 获取所有已认证连接
+    const now = Date.now();
     const connections = connectionManager.getAuthenticatedConnections();
+    const warningConnections: any[] = [];
+    const timeoutConnections: any[] = [];
 
-    console.log(`[WebSocket v3.0] 心跳检测: ${connections.length} 个活跃连接`);
+    for (const connection of connections) {
+      if (!connection.lastHeartbeatAt) {
+        console.warn(`[WebSocket v3.0] 连接 ${connection.robotId} 没有收到心跳`);
+        continue;
+      }
+
+      const elapsed = now - connection.lastHeartbeatAt.getTime();
+      const stats = messageHandler.getHeartbeatStats(connection);
+
+      // 检查是否需要发送警告
+      if (elapsed > WARNING_THRESHOLD && elapsed < HEARTBEAT_TIMEOUT) {
+        const remainingTime = HEARTBEAT_TIMEOUT - elapsed;
+        warningConnections.push({
+          robotId: connection.robotId,
+          elapsed,
+          remainingTime,
+        });
+
+        // 发送心跳警告
+        messageHandler.sendHeartbeatWarning(
+          connection,
+          'timeout_soon',
+          remainingTime,
+          connection.lastHeartbeatAt.getTime()
+        );
+      }
+
+      // 检查是否超时
+      if (elapsed >= HEARTBEAT_TIMEOUT) {
+        timeoutConnections.push({
+          robotId: connection.robotId,
+          elapsed,
+          stats,
+        });
+      }
+    }
+
+    // 清理超时连接
+    if (timeoutConnections.length > 0) {
+      console.warn(`[WebSocket v3.0] 发现 ${timeoutConnections.length} 个超时连接`);
+
+      for (const timeout of timeoutConnections) {
+        const connection = connectionManager.getConnection(timeout.robotId);
+        if (connection && connection.ws.readyState === WebSocket.OPEN) {
+          console.log(
+            `[WebSocket v3.0] 断开超时连接: ${timeout.robotId}, 超时时间: ${Math.round(timeout.elapsed / 1000)}秒`
+          );
+
+          // 发送错误消息
+          sendError(
+            connection.ws,
+            1000,
+            '心跳超时，连接已断开',
+            {
+              elapsed: timeout.elapsed,
+              lastHeartbeatAt: timeout.stats?.lastHeartbeatAt,
+            }
+          );
+
+          // 断开连接
+          connection.ws.close(1000, '心跳超时');
+          connectionManager.removeConnection(connection.ws);
+        }
+      }
+    }
+
+    // 记录心跳检测日志
+    if (connections.length > 0) {
+      console.log(
+        `[WebSocket v3.0] 心跳检测: ${connections.length} 个活跃连接` +
+          (warningConnections.length > 0 ? `, ${warningConnections.length} 个即将超时` : '') +
+          (timeoutConnections.length > 0 ? `, ${timeoutConnections.length} 个已超时` : '')
+      );
+    }
+
+    // 清理超时连接（双重保险）
+    connectionManager.cleanupTimeoutConnections(HEARTBEAT_TIMEOUT);
 
   }, HEARTBEAT_INTERVAL);
 
