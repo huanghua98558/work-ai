@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { z } from "zod";
+import { pushConfigToRobot } from "@/server/websocket-server";
 
 const activateCodeSchema = z.object({
   code: z.string().min(1),
@@ -258,6 +259,49 @@ export async function POST(request: NextRequest) {
 
     // 提交事务
     await client.query('COMMIT');
+
+    // 创建设备激活记录
+    const configVersion = `${Date.now()}`;
+    await client.query(`
+      INSERT INTO device_activations (
+        robot_id,
+        device_id,
+        user_id,
+        activated_at,
+        last_seen_at,
+        config_version,
+        config_synced,
+        created_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, NOW(), NOW(), $4, false, NOW(), NOW())
+      ON CONFLICT (robot_id, device_id) DO UPDATE SET
+        last_seen_at = NOW(),
+        config_version = $4,
+        config_synced = false,
+        updated_at = NOW()
+    `, [robot.bot_id, validatedData.deviceInfo.deviceId, validatedData.userId || code.created_by || 1, configVersion]);
+
+    // 准备配置数据
+    const config = {
+      aiMode: robot.ai_mode,
+      aiProvider: robot.ai_provider,
+      aiModel: robot.ai_model,
+      apiEndpoint: robot.api_endpoint,
+      apiKey: robot.api_key,
+      systemPrompt: robot.system_prompt,
+      temperature: robot.temperature,
+      maxTokens: robot.max_tokens,
+      thirdPartyEnabled: !!robot.third_party_callback_url,
+      thirdPartyCallbackUrl: robot.third_party_callback_url,
+      thirdPartySecretKey: robot.third_party_callback_secret_key,
+      thirdPartyFallbackEnabled: true,
+    };
+
+    // 推送配置到设备（如果设备在线）
+    const configPushed = await pushConfigToRobot(robot.bot_id, config, configVersion);
+    
+    console.log(`[激活] 配置推送${configPushed ? '成功' : '失败'}: robotId=${robot.bot_id}`);
 
     return NextResponse.json({
       success: true,

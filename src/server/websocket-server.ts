@@ -541,6 +541,24 @@ async function handleWsMessage(robotId: string, message: any, connection: WSConn
       }));
       break;
 
+    case 'config_ack':
+      // 配置确认
+      console.log(`[WebSocket] 收到配置确认: robotId=${robotId}`, data);
+      await handleConfigAck(robotId, data);
+      break;
+
+    case 'config_nack':
+      // 配置拒绝
+      console.log(`[WebSocket] 收到配置拒绝: robotId=${robotId}`, data);
+      await handleConfigNack(robotId, data);
+      break;
+
+    case 'message_log':
+      // 消息日志上报
+      console.log(`[WebSocket] 收到消息日志: robotId=${robotId}`, data);
+      await handleMessageLog(robotId, data);
+      break;
+
     default:
       connection.ws.send(JSON.stringify({
         type: 'error',
@@ -867,6 +885,145 @@ export function getOnlineRobots(): string[] {
 }
 
 /**
+ * 处理配置确认
+ */
+async function handleConfigAck(robotId: string, data: any) {
+  try {
+    const { configVersion, deviceId, timestamp } = data;
+
+    const poolInstance = await getPool();
+    const client = await poolInstance.connect();
+    try {
+      // 更新配置同步状态
+      await client.query(`
+        UPDATE device_activations
+        SET 
+          config_synced = true,
+          config_synced_at = $1,
+          config_error = NULL,
+          updated_at = NOW()
+        WHERE robot_id = $2 AND device_id = $3
+      `, [new Date(timestamp || Date.now()), robotId, deviceId]);
+
+      // 记录配置同步日志
+      await client.query(`
+        INSERT INTO config_sync_logs (
+          robot_id,
+          device_id,
+          config_version,
+          sync_status,
+          error_message,
+          synced_at,
+          created_at
+        )
+        VALUES ($1, $2, $3, 'success', NULL, $4, NOW())
+      `, [robotId, deviceId, configVersion, new Date(timestamp || Date.now())]);
+
+      console.log(`[WebSocket] 配置同步成功: robotId=${robotId}, version=${configVersion}`);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error(`[WebSocket] 处理配置确认失败:`, error);
+  }
+}
+
+/**
+ * 处理配置拒绝
+ */
+async function handleConfigNack(robotId: string, data: any) {
+  try {
+    const { configVersion, deviceId, error, errorCode, timestamp } = data;
+
+    const poolInstance = await getPool();
+    const client = await poolInstance.connect();
+    try {
+      // 更新配置同步状态
+      await client.query(`
+        UPDATE device_activations
+        SET 
+          config_synced = false,
+          config_error = $1,
+          updated_at = NOW()
+        WHERE robot_id = $2 AND device_id = $3
+      `, [error, robotId, deviceId]);
+
+      // 记录配置同步日志
+      await client.query(`
+        INSERT INTO config_sync_logs (
+          robot_id,
+          device_id,
+          config_version,
+          sync_status,
+          error_message,
+          error_code,
+          synced_at,
+          created_at
+        )
+        VALUES ($1, $2, $3, 'failed', $4, $5, $6, NOW())
+      `, [robotId, deviceId, configVersion, error, errorCode, new Date(timestamp || Date.now())]);
+
+      console.log(`[WebSocket] 配置同步失败: robotId=${robotId}, version=${configVersion}, error=${error}`);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error(`[WebSocket] 处理配置拒绝失败:`, error);
+  }
+}
+
+/**
+ * 处理消息日志上报
+ */
+async function handleMessageLog(robotId: string, data: any) {
+  try {
+    const { messageId, thirdPartyUrl, status, error, reportedAt } = data;
+
+    const poolInstance = await getPool();
+    const client = await poolInstance.connect();
+    try {
+      // 保存日志到数据库
+      await client.query(`
+        INSERT INTO message_fail_logs (
+          robot_id,
+          message_id,
+          third_party_url,
+          error_message,
+          error_type,
+          failed_at,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      `, [
+        robotId,
+        messageId,
+        thirdPartyUrl,
+        error || 'Unknown error',
+        status === 'failed' ? 'client_error' : 'success',
+        reportedAt || new Date()
+      ]);
+
+      console.log(`[WebSocket] 消息日志已记录: ${messageId}`);
+
+      // 如果发送失败，更新消息状态
+      if (status === 'failed') {
+        await client.query(`
+          UPDATE messages
+          SET status = 'failed',
+              error_message = $1,
+              updated_at = NOW()
+          WHERE message_id = $2
+        `, [error, messageId]);
+      }
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error(`[WebSocket] 处理消息日志失败:`, error);
+  }
+}
+
+/**
  * 获取连接数
  */
 export function getConnectionCount(): number {
@@ -900,3 +1057,66 @@ export function getServerStatus(): 'running' | 'stopped' {
 export function sendWebSocketMessage(robotId: string, message: any): boolean {
   return sendToRobot(robotId, message);
 }
+
+/**
+ * 推送配置到机器人
+ */
+export async function pushConfigToRobot(robotId: string, config: any, configVersion: string): Promise<boolean> {
+  const connection = connections.get(robotId);
+  
+  if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[WebSocket] 机器人 ${robotId} 未在线，无法推送配置`);
+    return false;
+  }
+
+  const message = {
+    type: 'config_push',
+    data: {
+      robotId,
+      configVersion,
+      config,
+      timestamp: Date.now(),
+    },
+  };
+
+  try {
+    connection.ws.send(JSON.stringify(message));
+    console.log(`[WebSocket] 配置已推送到机器人 ${robotId}`);
+    return true;
+  } catch (error) {
+    console.error(`[WebSocket] 推送配置失败:`, error);
+    return false;
+  }
+}
+
+/**
+ * 发送第三方回调消息到机器人
+ */
+export function sendCallbackToRobot(robotId: string, callbackId: string, callbackType: string, payload: any): boolean {
+  const connection = connections.get(robotId);
+  
+  if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[WebSocket] 机器人 ${robotId} 未在线，无法发送回调消息`);
+    return false;
+  }
+
+  const message = {
+    type: 'callback',
+    data: {
+      callbackId,
+      callbackType,
+      payload,
+      timestamp: Date.now(),
+    },
+  };
+
+  try {
+    connection.ws.send(JSON.stringify(message));
+    console.log(`[WebSocket] 回调消息已发送到机器人 ${robotId}`);
+    return true;
+  } catch (error) {
+    console.error(`[WebSocket] 发送回调消息失败:`, error);
+    return false;
+  }
+}
+
