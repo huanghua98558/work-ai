@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Zap,
   ArrowRight,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,55 +32,35 @@ interface UserInfo {
   userId: number;
   phone: string;
   role: string;
+  nickname?: string;
 }
 
-interface StatCard {
+interface StatsData {
+  totalRobots: number;
+  totalActivationCodes: number;
+  unusedActivationCodes: number;
+  usedActivationCodes: number;
+  expiredActivationCodes: number;
+  totalConversations: number;
+  totalMessages: number;
+  activeRobots: number;
+  todayMessages: number;
+  activeUsers: number;
+}
+
+interface RecentActivity {
+  id: string;
   title: string;
-  value: string | number;
-  change: string;
-  changeType: 'increase' | 'decrease';
-  icon: any;
-  gradient: string;
-  href: string;
+  description: string;
+  time: string;
+  type: 'success' | 'info' | 'warning';
 }
 
-const statCards: StatCard[] = [
-  {
-    title: '机器人总数',
-    value: '12',
-    change: '+2',
-    changeType: 'increase',
-    icon: Bot,
-    gradient: 'from-blue-500 to-indigo-600',
-    href: '/robots',
-  },
-  {
-    title: '用户总数',
-    value: '156',
-    change: '+18',
-    changeType: 'increase',
-    icon: Users,
-    gradient: 'from-purple-500 to-violet-600',
-    href: '/users',
-  },
-  {
-    title: '消息总数',
-    value: '2,456',
-    change: '+324',
-    changeType: 'increase',
-    icon: MessageSquare,
-    gradient: 'from-cyan-500 to-blue-600',
-    href: '/messages',
-  },
-  {
-    title: '知识库条目',
-    value: '89',
-    change: '+12',
-    changeType: 'increase',
-    icon: Database,
-    gradient: 'from-pink-500 to-rose-600',
-    href: '/knowledge',
-  },
+const statCardConfig = [
+  { title: '机器人总数', icon: Bot, gradient: 'from-blue-500 to-indigo-600', href: '/robots', valueKey: 'totalRobots' as const, onlineKey: 'activeRobots' as const },
+  { title: '用户总数', icon: Users, gradient: 'from-purple-500 to-violet-600', href: '/users', valueKey: 'activeUsers' as const, change: '+18%' },
+  { title: '消息总数', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', href: '/messages', valueKey: 'totalMessages' as const, todayKey: 'todayMessages' as const },
+  { title: '激活码', icon: Key, gradient: 'from-pink-500 to-rose-600', href: '/activation-codes', valueKey: 'totalActivationCodes' as const, unusedKey: 'unusedActivationCodes' as const },
 ];
 
 const quickActions = [
@@ -89,19 +70,22 @@ const quickActions = [
   { name: '系统监控', href: '/monitor', icon: Activity, gradient: 'from-rose-500 to-red-600', description: '实时监控系统状态' },
 ];
 
-const recentActivity = [
-  { id: 1, title: '新机器人上线', description: '客服机器人 #12 已成功上线', time: '5 分钟前', type: 'success' },
-  { id: 2, title: '用户注册', description: '用户 user_001 完成注册', time: '12 分钟前', type: 'info' },
-  { id: 3, title: '消息高峰', description: '系统检测到消息流量激增', time: '25 分钟前', type: 'warning' },
-  { id: 4, title: '激活码使用', description: '激活码 ABC123 已被使用', time: '1 小时前', type: 'success' },
-  { id: 5, title: '系统更新', description: '知识库已更新至 v2.3', time: '2 小时前', type: 'info' },
+const systemStatusItems = [
+  { name: 'API 服务', status: '运行中', color: 'green' as const },
+  { name: '数据库', status: '运行中', color: 'green' as const },
+  { name: 'WebSocket', status: '运行中', color: 'green' as const },
+  { name: '缓存服务', status: '正常运行', color: 'green' as const },
 ];
 
 export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserInfo | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // 检查用户权限
   useEffect(() => {
     const checkUserPermission = async () => {
       try {
@@ -129,6 +113,8 @@ export default function AdminPage() {
         if (data.success && data.data) {
           const currentUser = data.data;
           setUser(currentUser);
+          // 加载统计数据
+          loadStats();
         }
       } catch (error) {
         console.error('检查用户权限失败:', error);
@@ -142,6 +128,76 @@ export default function AdminPage() {
     checkUserPermission();
   }, [router]);
 
+  // 加载统计数据
+  const loadStats = async () => {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/dashboard/stats', { headers });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setStats(data.data.stats);
+
+          // 从最近机器人数据生成活动记录
+          const activities: RecentActivity[] = [];
+
+          if (data.data.recentRobots && data.data.recentRobots.length > 0) {
+            data.data.recentRobots.forEach((robot: any) => {
+              if (robot.status === 'online') {
+                activities.push({
+                  id: robot.id,
+                  title: '机器人上线',
+                  description: `${robot.name} 已上线`,
+                  time: robot.lastActive,
+                  type: 'success',
+                });
+              }
+            });
+          }
+
+          // 从最近激活码数据生成活动记录
+          if (data.data.recentActivationCodes && data.data.recentActivationCodes.length > 0) {
+            data.data.recentActivationCodes.forEach((code: any) => {
+              if (code.status === 'used') {
+                activities.push({
+                  id: code.id,
+                  title: '激活码使用',
+                  description: `激活码 ${code.code} 已被使用`,
+                  time: code.timeAgo,
+                  type: 'success',
+                });
+              } else if (code.status === 'unused') {
+                activities.push({
+                  id: code.id,
+                  title: '创建激活码',
+                  description: `激活码 ${code.code} 已创建`,
+                  time: code.timeAgo,
+                  type: 'info',
+                });
+              }
+            });
+          }
+
+          setRecentActivity(activities.slice(0, 5));
+        }
+      }
+    } catch (error) {
+      console.error('加载统计数据失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 显示权限错误
   if (permissionError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
@@ -169,12 +225,13 @@ export default function AdminPage() {
     );
   }
 
+  // 等待权限检查
   if (!user && !permissionError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="mt-4 text-muted-foreground">正在加载...</p>
+          <p className="mt-4 text-muted-foreground">正在验证权限...</p>
         </div>
       </div>
     );
@@ -211,37 +268,61 @@ export default function AdminPage() {
 
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((stat) => {
-            const Icon = stat.icon;
+          {statCardConfig.map((config) => {
+            const Icon = config.icon;
+
+            if (!stats) {
+              return null;
+            }
+
+            const value = stats[config.valueKey] || 0;
+            const change = config.change || '+0%';
+            const changeType = 'increase' as const;
+
             return (
-              <Link key={stat.title} href={stat.href}>
+              <Link key={config.title} href={config.href}>
                 <Card className="hover:shadow-lg transition-all cursor-pointer border-0 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className={cn(
                         'w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br',
-                        stat.gradient
+                        config.gradient
                       )}>
                         <Icon className="h-6 w-6 text-white" />
                       </div>
                       <div className={cn(
                         'text-xs font-medium px-2 py-1 rounded-full',
-                        stat.changeType === 'increase'
+                        changeType === 'increase'
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                           : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                       )}>
-                        {stat.change}
+                        {change}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-1">
                       <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                        {stat.value}
+                        {loading ? '-' : value.toLocaleString()}
                       </div>
                       <div className="text-xs text-slate-600 dark:text-slate-400">
-                        {stat.title}
+                        {config.title}
                       </div>
+                      {(config.onlineKey && stats[config.onlineKey] > 0) && (
+                        <div className="text-xs text-slate-500 dark:text-slate-500">
+                          在线: {stats[config.onlineKey]}
+                        </div>
+                      )}
+                      {(config.todayKey && stats[config.todayKey] > 0) && (
+                        <div className="text-xs text-slate-500 dark:text-slate-500">
+                          今日: {stats[config.todayKey]}
+                        </div>
+                      )}
+                      {(config.unusedKey && stats[config.unusedKey] > 0) && (
+                        <div className="text-xs text-slate-500 dark:text-slate-500">
+                          未使用: {stats[config.unusedKey]}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -360,34 +441,27 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-slate-900 dark:text-white">API 服务</span>
+                {systemStatusItems.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        'w-3 h-3 rounded-full animate-pulse',
+                        item.color === 'green' ? 'bg-green-500' :
+                        item.color === 'amber' ? 'bg-amber-500' :
+                        'bg-red-500'
+                      )} />
+                      <span className="text-sm text-slate-900 dark:text-white">{item.name}</span>
+                    </div>
+                    <span className={cn(
+                      'text-sm',
+                      item.color === 'green' ? 'text-green-600 dark:text-green-400' :
+                      item.color === 'amber' ? 'text-amber-600 dark:text-amber-400' :
+                      'text-red-600 dark:text-red-400'
+                    )}>
+                      {item.status}
+                    </span>
                   </div>
-                  <span className="text-sm text-green-600 dark:text-green-400">运行中</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-slate-900 dark:text-white">数据库</span>
-                  </div>
-                  <span className="text-sm text-green-600 dark:text-green-400">运行中</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-slate-900 dark:text-white">WebSocket</span>
-                  </div>
-                  <span className="text-sm text-green-600 dark:text-green-400">运行中</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-slate-900 dark:text-white">缓存服务</span>
-                  </div>
-                  <span className="text-sm text-amber-600 dark:text-amber-400">高负载</span>
-                </div>
+                ))}
               </div>
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <Button variant="outline" size="sm" className="w-full" asChild>
