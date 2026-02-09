@@ -42,13 +42,13 @@ const navigation: NavItem[] = [
 
   // 系统管理 - 仅管理员
   { name: '激活码管理', href: '/activation-codes', icon: Key, gradient: 'from-green-500 to-emerald-600', category: '系统管理', requireAdmin: true },
-  { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', category: '系统管理', requireAdmin: true },
+  { name: '机器人管理', href: '/admin/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', category: '系统管理', requireAdmin: true },
   { name: '系统监控', href: '/monitor', icon: MonitorPlay, gradient: 'from-rose-500 to-red-600', category: '系统管理', requireAdmin: true },
   { name: '审计日志', href: '/audit-logs', icon: FileText, gradient: 'from-indigo-500 to-blue-600', category: '系统管理', requireAdmin: true },
 
   // 数据管理 - 仅管理员
-  { name: '消息管理', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', category: '数据管理', requireAdmin: true },
-  { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', category: '数据管理', requireAdmin: true },
+  { name: '消息管理', href: '/admin/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', category: '数据管理', requireAdmin: true },
+  { name: '知识库管理', href: '/admin/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', category: '数据管理', requireAdmin: true },
   { name: '数据导出', href: '/export', icon: Download, gradient: 'from-amber-500 to-orange-600', category: '数据管理', requireAdmin: true },
 
   // 监控工具 - 仅管理员
