@@ -1,276 +1,350 @@
 /**
- * API 客户端 - 自动处理权限问题
+ * API 客户端
+ * 自动处理 Token 验证、刷新和错误重试
  */
 
-interface RequestOptions extends RequestInit {
-  autoFixRole?: boolean;  // 是否自动修复角色问题
-  onPermissionError?: () => void;  // 权限错误回调
+// Token 管理接口
+export interface TokenStorage {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
 }
 
-// 确保只在客户端访问 localStorage
-const isClient = typeof window !== 'undefined';
-
-/**
- * 获取 Token
- */
-function getToken(): string | null {
-  if (!isClient) return null;
-  return localStorage.getItem('token');
+// API 响应接口
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  code?: string;
+  details?: any;
 }
 
-/**
- * 设置 Token
- */
-function setToken(token: string): void {
-  if (!isClient) return;
-  localStorage.setItem('token', token);
+// 请求配置接口
+export interface RequestConfig {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Record<string, string>;
+  body?: any;
+  retry?: boolean; // 是否自动重试（Token 过期时）
+  skipAuth?: boolean; // 是否跳过认证
 }
 
-/**
- * 移除 Token
- */
-function removeToken(): void {
-  if (!isClient) return;
-  localStorage.removeItem('token');
-}
+// Token 刷新中标志
+let isRefreshing = false;
+// 等待刷新的请求队列
+let refreshSubscribers: Array<(token: string) => void> = [];
 
 /**
- * 认证请求包装器 - 自动处理 403 权限错误
+ * Token 管理类
  */
-async function authenticatedFetch(
-  url: string,
-  options: RequestOptions = {}
-): Promise<any> {
-  const { autoFixRole = true, onPermissionError, ...fetchOptions } = options;
+class TokenManager {
+  /**
+   * 获取存储的 Token
+   */
+  static getTokens(): TokenStorage | null {
+    try {
+      const tokenStr = localStorage.getItem('tokens');
+      if (!tokenStr) return null;
 
-  const token = getToken();
+      const tokens = JSON.parse(tokenStr) as TokenStorage;
 
-  if (!token && isClient) {
-    throw new Error('未登录');
+      // 检查是否过期
+      if (Date.now() >= tokens.expiresAt) {
+        console.warn('[TokenManager] Access token 已过期');
+        return tokens; // 返回过期 token，让 API 层处理刷新
+      }
+
+      return tokens;
+    } catch (error) {
+      console.error('[TokenManager] 读取 token 失败:', error);
+      return null;
+    }
   }
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-    ...fetchOptions.headers,
-  };
+  /**
+   * 保存 Token
+   */
+  static saveTokens(accessToken: string, refreshToken: string): void {
+    const tokens: TokenStorage = {
+      accessToken,
+      refreshToken,
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30天后过期
+    };
 
-  try {
-    const response = await fetch(url, { ...fetchOptions, headers });
+    localStorage.setItem('tokens', JSON.stringify(tokens));
+    console.log('[TokenManager] Token 已保存');
+  }
 
-    // 检查 403 权限错误
-    if (response.status === 403 && autoFixRole && isClient) {
-      console.log('[API 客户端] 检测到权限不足（403），尝试自动修复');
+  /**
+   * 清除 Token
+   */
+  static clearTokens(): void {
+    localStorage.removeItem('tokens');
+    console.log('[TokenManager] Token 已清除');
+  }
 
-      // 尝试检查并修复角色
-      try {
-        const checkRes = await fetch('/api/auth/check-role', { headers });
-        const checkData = await checkRes.json();
+  /**
+   * 检查 Token 是否即将过期（5分钟内）
+   */
+  static isTokenExpiringSoon(): boolean {
+    const tokens = this.getTokens();
+    if (!tokens) return false;
 
-        console.log('[API 客户端] 角色检查结果:', checkData);
+    const expiresIn = tokens.expiresAt - Date.now();
+    return expiresIn < 5 * 60 * 1000; // 5分钟内
+  }
 
-        if (checkData.success && checkData.data && !checkData.data.consistent) {
-          // 角色不一致，使用新的 Token
-          const newToken = checkData.data.newToken;
-          console.log('[API 客户端] 使用新的 Token 重新请求');
-          setToken(newToken);
+  /**
+   * 获取 Access Token
+   */
+  static getAccessToken(): string | null {
+    const tokens = this.getTokens();
+    return tokens?.accessToken || null;
+  }
 
-          // 显示提示
-          showToast('权限已更新', `您的角色已从 ${checkData.data.oldRole} 更新为 ${checkData.data.newRole}，正在重新加载...`);
+  /**
+   * 获取 Refresh Token
+   */
+  static getRefreshToken(): string | null {
+    const tokens = this.getTokens();
+    return tokens?.refreshToken || null;
+  }
+}
 
-          // 使用新的 Token 重新请求
-          return authenticatedFetch(url, { ...options, autoFixRole: false });
-        } else if (checkData.success && checkData.data && checkData.data.consistent) {
-          // 角色一致但仍然没有权限
-          console.log('[API 客户端] 角色一致但仍然没有权限');
-          throw new Error('权限不足');
+/**
+ * API 客户端类
+ */
+class ApiClient {
+  private baseURL: string;
+  private defaultHeaders: Record<string, string>;
+
+  constructor() {
+    this.baseURL = '';
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+    };
+  }
+
+  /**
+   * 刷新 Access Token
+   */
+  private async refreshAccessToken(): Promise<string | null> {
+    const refreshToken = TokenManager.getRefreshToken();
+    if (!refreshToken) {
+      console.error('[ApiClient] 没有 Refresh Token');
+      return null;
+    }
+
+    try {
+      const response = await fetch('/api/auth/refresh-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error('[ApiClient] 刷新 Token 失败:', data.error);
+        TokenManager.clearTokens();
+        return null;
+      }
+
+      // 保存新的 Token
+      TokenManager.saveTokens(data.data.accessToken, data.data.refreshToken);
+
+      return data.data.accessToken;
+    } catch (error) {
+      console.error('[ApiClient] 刷新 Token 请求失败:', error);
+      TokenManager.clearTokens();
+      return null;
+    }
+  }
+
+  /**
+   * 添加订阅者
+   */
+  private subscribeTokenRefresh(callback: (token: string) => void): void {
+    refreshSubscribers.push(callback);
+  }
+
+  /**
+   * 通知订阅者
+   */
+  private notifySubscribers(token: string): void {
+    refreshSubscribers.forEach((callback) => callback(token));
+    refreshSubscribers = [];
+  }
+
+  /**
+   * 发送请求
+   */
+  private async request<T>(
+    url: string,
+    config: RequestConfig = {}
+  ): Promise<ApiResponse<T>> {
+    const {
+      method = 'GET',
+      headers = {},
+      body,
+      retry = true,
+      skipAuth = false,
+    } = config;
+
+    // 合并请求头
+    const requestHeaders: Record<string, string> = {
+      ...this.defaultHeaders,
+      ...headers,
+    };
+
+    // 添加 Authorization 头
+    if (!skipAuth) {
+      const token = TokenManager.getAccessToken();
+      if (token) {
+        requestHeaders['Authorization'] = `Bearer ${token}`;
+      }
+    }
+
+    // 构建请求选项
+    const options: RequestInit = {
+      method,
+      headers: requestHeaders,
+    };
+
+    // 添加请求体
+    if (body && method !== 'GET') {
+      options.body = JSON.stringify(body);
+    }
+
+    try {
+      // 发送请求
+      const response = await fetch(this.baseURL + url, options);
+      const data = await response.json();
+
+      // 处理 401 未授权错误
+      if (response.status === 401 && retry && !skipAuth) {
+        console.warn('[ApiClient] 收到 401 响应，尝试刷新 Token');
+
+        // 如果正在刷新，等待刷新完成
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            this.subscribeTokenRefresh((token: string) => {
+              // 使用新 token 重试请求
+              this.request(url, { ...config, retry: false })
+                .then(resolve)
+                .catch(reject);
+            });
+          });
         }
-      } catch (error) {
-        console.error('[API 客户端] 检查角色失败:', error);
+
+        // 开始刷新 Token
+        isRefreshing = true;
+
+        try {
+          const newToken = await this.refreshAccessToken();
+
+          if (!newToken) {
+            // 刷新失败，跳转到登录页
+            console.error('[ApiClient] Token 刷新失败，跳转到登录页');
+            TokenManager.clearTokens();
+            window.location.href = '/login';
+            return { success: false, error: '登录已过期，请重新登录' };
+          }
+
+          // 通知所有等待的请求
+          this.notifySubscribers(newToken);
+
+          // 使用新 token 重试请求
+          return await this.request(url, { ...config, retry: false });
+        } finally {
+          isRefreshing = false;
+        }
       }
 
-      // 如果自动修复失败，触发回调或抛出错误
-      if (onPermissionError) {
-        onPermissionError();
-      } else {
-        throw new Error('权限不足，请重新登录');
-      }
+      return data;
+    } catch (error: any) {
+      console.error('[ApiClient] 请求失败:', error);
+      return {
+        success: false,
+        error: error.message || '网络请求失败',
+      };
     }
-
-    // 检查其他错误
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || '请求失败');
-    }
-
-    return await response.json();
-  } catch (error: any) {
-    console.error('[API 客户端] 请求失败:', error);
-    throw error;
   }
-}
 
-/**
- * API 客户端实例 - 兼容旧代码
- */
-export const apiClient = {
   /**
    * GET 请求
    */
-  async get<T = any>(url: string, params?: any): Promise<{ data: T }> {
-    // 如果有参数，将它们附加到 URL 上
-    const queryString = params ? `?${new URLSearchParams(params)}` : '';
-    const response = await authenticatedFetch(`${url}${queryString}`, { method: 'GET' });
-    return { data: response };
-  },
+  async get<T>(url: string, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
+    return this.request<T>(url, { ...config, method: 'GET' });
+  }
 
   /**
    * POST 请求
    */
-  async post<T = any>(url: string, data: any): Promise<{ data: T }> {
-    const response = await authenticatedFetch(url, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return { data: response };
-  },
+  async post<T>(url: string, body?: any, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(url, { ...config, method: 'POST', body });
+  }
 
   /**
    * PUT 请求
    */
-  async put<T = any>(url: string, data: any): Promise<{ data: T }> {
-    const response = await authenticatedFetch(url, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-    return { data: response };
-  },
-
-  /**
-   * PATCH 请求
-   */
-  async patch<T = any>(url: string, data: any): Promise<{ data: T }> {
-    const response = await authenticatedFetch(url, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-    return { data: response };
-  },
+  async put<T>(url: string, body?: any, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(url, { ...config, method: 'PUT', body });
+  }
 
   /**
    * DELETE 请求
    */
-  async delete<T = any>(url: string): Promise<{ data: T }> {
-    const response = await authenticatedFetch(url, { method: 'DELETE' });
-    return { data: response };
-  },
+  async delete<T>(url: string, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
+    return this.request<T>(url, { ...config, method: 'DELETE' });
+  }
 
   /**
-   * 设置 Token
+   * PATCH 请求
    */
-  setToken,
+  async patch<T>(url: string, body?: any, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    return this.request<T>(url, { ...config, method: 'PATCH', body });
+  }
+}
 
-  /**
-   * 获取 Token
-   */
-  getToken,
-
-  /**
-   * 移除 Token
-   */
-  removeToken,
-};
+// 导出单例
+export const apiClient = new ApiClient();
+export { TokenManager };
 
 /**
- * 显示 Toast 提示
+ * 便捷方法：验证 Token 是否有效
  */
-function showToast(title: string, description: string) {
-  // 动态创建 toast 元素
-  const toast = document.createElement('div');
-  toast.className = 'fixed top-4 right-4 z-50 p-4 bg-blue-500 text-white rounded-lg shadow-lg';
-  toast.innerHTML = `
-    <div class="font-semibold">${title}</div>
-    <div class="text-sm">${description}</div>
-  `;
-  document.body.appendChild(toast);
+export function validateToken(): boolean {
+  const tokens = TokenManager.getTokens();
+  if (!tokens) return false;
 
-  // 3 秒后自动消失
-  setTimeout(() => {
-    toast.remove();
-  }, 3000);
+  // 检查是否过期
+  if (Date.now() >= tokens.expiresAt) {
+    console.warn('[validateToken] Token 已过期');
+    return false;
+  }
+
+  return true;
 }
 
 /**
- * 创建激活码管理专用的 API 客户端
+ * 便捷方法：获取用户信息（从 Token 中解析）
  */
-export const activationCodesAPI = {
-  getList: (params?: any) => {
-    const queryString = params ? `?${new URLSearchParams(params)}` : '';
-    return authenticatedFetch(`/api/activation-codes${queryString}`);
-  },
+export function getUserInfoFromToken(): { userId: number; phone: string; role: string } | null {
+  const tokens = TokenManager.getTokens();
+  if (!tokens) return null;
 
-  create: (data: any) => {
-    return authenticatedFetch('/api/activation-codes', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  delete: (id: number) => {
-    return authenticatedFetch(`/api/activation-codes/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  update: (id: number, data: any) => {
-    return authenticatedFetch(`/api/activation-codes/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-};
-
-/**
- * 创建机器人管理专用的 API 客户端
- */
-export const robotsAPI = {
-  getList: (params?: any) => {
-    const queryString = params ? `?${new URLSearchParams(params)}` : '';
-    return authenticatedFetch(`/api/robots${queryString}`);
-  },
-
-  create: (data: any) => {
-    return authenticatedFetch('/api/robots', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  delete: (id: number) => {
-    return authenticatedFetch(`/api/robots/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  update: (id: number, data: any) => {
-    return authenticatedFetch(`/api/robots/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-};
-
-/**
- * 创建用户管理专用的 API 客户端
- */
-export const usersAPI = {
-  getCurrentUser: () => {
-    return authenticatedFetch('/api/users/me');
-  },
-
-  promoteToAdmin: () => {
-    return authenticatedFetch('/api/users/promote-admin', {
-      method: 'POST',
-    });
-  },
-};
+  try {
+    // 解析 JWT payload
+    const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
+    return {
+      userId: payload.userId,
+      phone: payload.phone,
+      role: payload.role,
+    };
+  } catch (error) {
+    console.error('[getUserInfoFromToken] 解析 Token 失败:', error);
+    return null;
+  }
+}
