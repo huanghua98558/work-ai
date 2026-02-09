@@ -1,8 +1,6 @@
-import { config } from 'dotenv';
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, PoolConfig } from "pg";
 import * as schema from "../storage/database/shared/schema";
-import { isProduction, isDevelopment, isTest } from "./env-validation";
 
 // 延迟加载的数据库连接池
 let _pool: Pool | null = null;
@@ -14,13 +12,9 @@ const RETRY_DELAY = 1000; // 1秒
 
 // 从环境变量获取数据库连接字符串
 function getConnectionString(): string {
-  // 尝试加载 .env 文件（本地开发环境）
+  // 直接使用 process.env，不依赖 dotenv
   // Coze 平台等云平台会直接将环境变量注入到 process.env 中
-  try {
-    config({ path: '.env' });
-  } catch (error) {
-    // 忽略 .env 文件不存在或读取失败的情况
-  }
+  // 本地开发可以手动设置环境变量或使用 .env 文件（由用户自行加载）
 
   const connectionString = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
 
@@ -39,11 +33,11 @@ function getPoolConfig(): PoolConfig {
   // 根据环境调整连接池大小（优化内存使用）
   let maxConnections, minConnections;
 
-  if (isProduction()) {
+  if (env === 'production') {
     // 生产环境：适中的连接池（减少内存占用）
     maxConnections = 20;
     minConnections = 5;
-  } else if (isDevelopment()) {
+  } else if (env === 'development') {
     // 开发环境：较小的连接池
     maxConnections = 10;
     minConnections = 1;

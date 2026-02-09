@@ -1,18 +1,34 @@
-import { config } from 'dotenv';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { initializeWebSocketServer } from './src/server/websocket-server-v3';
 import { cleanupZombieProcesses, getSystemStats } from './src/lib/process-cleanup';
 
-// 首先加载环境变量（仅在 .env 文件存在时加载）
-// Coze 平台等云平台会直接将环境变量注入到 process.env 中
-// 本地开发可以使用 .env 文件
-try {
-  config({ path: '.env' });
-} catch (error) {
-  // 忽略 .env 文件不存在或读取失败的情况
-  // 环境变量可能已经由平台注入
+// 检查必需的环境变量
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ 缺少必需的环境变量:');
+  missingEnvVars.forEach(varName => {
+    console.error(`  - ${varName}: 未配置`);
+  });
+  console.error('');
+  console.error('配置方式：');
+  console.error('');
+  console.error('📖 本地开发：');
+  console.error('  在项目根目录创建 .env 文件并配置以上环境变量');
+  console.error('');
+  console.error('☁️  Coze 平台部署：');
+  console.error('  1. 进入 Coze 平台项目设置');
+  console.error('  2. 找到"环境变量"或"Secrets"配置页面');
+  console.error('  3. 添加以下必需的环境变量：');
+  console.error('     - DATABASE_URL: PostgreSQL 数据库连接字符串');
+  console.error('     - JWT_SECRET: 至少 32 个字符的随机密钥');
+  console.error('  4. 保存配置并重新部署');
+  console.error('');
+  console.error('📚 详细配置指南请查看：COZE_ENV_SETUP.md');
+  process.exit(1);
 }
 
 // 增加 Node.js 内存限制（防止 OOM）
