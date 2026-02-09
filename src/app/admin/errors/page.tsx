@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, RefreshCw, XCircle, CheckCircle2, Info, AlertTriangle } from 'lucide-react';
+import { AlertCircle, RefreshCw, XCircle, CheckCircle2, Info, AlertTriangle, ShieldAlert } from 'lucide-react';
 
 interface ErrorLog {
   id: string;
@@ -16,11 +17,64 @@ interface ErrorLog {
   context?: Record<string, any>;
 }
 
+interface UserInfo {
+  userId: number;
+  phone: string;
+  role: string;
+}
+
 export default function AdminErrorsPage() {
+  const router = useRouter();
   const [errors, setErrors] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedError, setSelectedError] = useState<ErrorLog | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
+  // 检查用户角色
+  useEffect(() => {
+    const checkUserPermission = async () => {
+      try {
+        const response = await fetch('/api/users/me');
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // 未登录，跳转到登录页
+            router.push('/login?redirect=/admin/errors');
+            return;
+          }
+          throw new Error('获取用户信息失败');
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          const currentUser = data.data;
+
+          // 检查是否是管理员
+          if (currentUser.role !== 'admin') {
+            setPermissionError('您没有管理员权限，无法访问此页面');
+            setTimeout(() => {
+              router.push('/');
+            }, 3000);
+            return;
+          }
+
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('检查用户权限失败:', error);
+        setPermissionError('无法验证您的权限');
+        setTimeout(() => {
+          router.push('/');
+        }, 3000);
+      }
+    };
+
+    checkUserPermission();
+  }, [router]);
+
+  // 获取错误列表
   const fetchErrors = async () => {
     try {
       setLoading(true);
@@ -31,6 +85,9 @@ export default function AdminErrorsPage() {
         setErrors(data.data.errors);
       } else {
         console.error('Failed to fetch errors:', data.error);
+        if (response.status === 403) {
+          setPermissionError('您没有管理员权限，无法访问此页面');
+        }
       }
     } catch (error) {
       console.error('Error fetching errors:', error);
@@ -39,12 +96,57 @@ export default function AdminErrorsPage() {
     }
   };
 
+  // 自动刷新错误列表
   useEffect(() => {
+    if (!user && !permissionError) return; // 等待权限检查完成
     fetchErrors();
     // 每 30 秒自动刷新
     const interval = setInterval(fetchErrors, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user, permissionError]);
+
+  // 显示权限错误
+  if (permissionError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+        <div className="max-w-md w-full mx-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-center mb-4">
+                <ShieldAlert className="h-12 w-12 text-destructive" />
+              </div>
+              <CardTitle className="text-center text-2xl">权限不足</CardTitle>
+              <CardDescription className="text-center">
+                {permissionError}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-sm text-muted-foreground mb-4">
+                即将跳转到首页...
+              </p>
+              <div className="flex justify-center">
+                <Button onClick={() => router.push('/')} variant="outline">
+                  立即跳转
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // 等待权限检查
+  if (!user && !permissionError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="mt-4 text-muted-foreground">正在验证权限...</p>
+        </div>
+      </div>
+    );
+  }
 
   const getLevelIcon = (level: string) => {
     switch (level) {
@@ -199,8 +301,7 @@ export default function AdminErrorsPage() {
                               .slice(0, 2)
                               .map(([key, value]) => (
                                 <span key={key} className="mr-2">
-                                  {key}: {String(value).slice(0, 50)}
-                                  {String(value).length > 50 && '...'}
+                                  <strong>{key}:</strong> {JSON.stringify(value)}
                                 </span>
                               ))}
                           </div>
@@ -214,75 +315,42 @@ export default function AdminErrorsPage() {
           </CardContent>
         </Card>
 
-        {/* 错误详情对话框 */}
+        {/* 错误详情弹窗 */}
         {selectedError && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-            onClick={() => setSelectedError(null)}
-          >
-            <Card
-              className="max-w-4xl w-full max-h-[80vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedError(null)}>
+            <Card className="max-w-4xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
+                    <Badge variant={getLevelColor(selectedError.level) as any} className="mb-2">
                       {getLevelIcon(selectedError.level)}
                       {selectedError.level.toUpperCase()}
-                    </CardTitle>
+                    </Badge>
+                    <CardTitle className="text-xl">{selectedError.message}</CardTitle>
                     <CardDescription>
                       {formatTimestamp(selectedError.timestamp)}
                     </CardDescription>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedError(null)}
-                  >
-                    <XCircle className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setSelectedError(null)}>
+                    <XCircle className="h-5 w-5" />
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 消息 */}
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">错误消息</h3>
-                  <Alert variant={selectedError.level === 'error' ? 'destructive' : 'default'}>
-                    <AlertDescription>{selectedError.message}</AlertDescription>
-                  </Alert>
-                </div>
-
-                {/* 堆栈跟踪 */}
+              <CardContent>
                 {selectedError.stack && (
-                  <div>
-                    <h3 className="mb-2 text-sm font-semibold">堆栈跟踪</h3>
-                    <pre className="overflow-x-auto rounded-lg bg-slate-100 dark:bg-slate-800 p-4 text-xs font-mono">
+                  <div className="mb-4">
+                    <h4 className="font-semibold mb-2 text-sm">堆栈跟踪</h4>
+                    <pre className="bg-slate-950 text-slate-50 p-4 rounded text-xs overflow-x-auto">
                       {selectedError.stack}
                     </pre>
                   </div>
                 )}
-
-                {/* 上下文 */}
                 {selectedError.context && Object.keys(selectedError.context).length > 0 && (
                   <div>
-                    <h3 className="mb-2 text-sm font-semibold">上下文信息</h3>
-                    <div className="overflow-x-auto rounded-lg bg-slate-100 dark:bg-slate-800 p-4">
-                      <table className="w-full text-sm">
-                        <tbody>
-                          {Object.entries(selectedError.context).map(([key, value]) => (
-                            <tr key={key} className="border-t border-slate-200 dark:border-slate-700">
-                              <td className="py-2 pr-4 font-medium">{key}</td>
-                              <td className="py-2 font-mono text-xs break-all">
-                                {typeof value === 'object'
-                                  ? JSON.stringify(value, null, 2)
-                                  : String(value)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <h4 className="font-semibold mb-2 text-sm">上下文信息</h4>
+                    <pre className="bg-slate-950 text-slate-50 p-4 rounded text-xs overflow-x-auto">
+                      {JSON.stringify(selectedError.context, null, 2)}
+                    </pre>
                   </div>
                 )}
               </CardContent>

@@ -51,6 +51,11 @@ const pageAuthPaths = [
   "/conversations",
 ];
 
+// 需要管理员权限的路径
+const adminPaths = [
+  "/admin",
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -165,6 +170,35 @@ export async function middleware(request: NextRequest) {
         const loginUrl = new URL("/login", request.url);
         loginUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(loginUrl);
+      }
+    }
+
+    // 对于需要管理员权限的页面路由
+    if (adminPaths.some((path) => pathname.startsWith(path))) {
+      if (!token || !user) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("redirect", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+
+      // 检查是否是管理员
+      if (user.role !== "admin") {
+        // 非管理员，返回 403 或重定向到首页
+        if (pathname.startsWith("/api")) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "权限不足，需要管理员权限",
+              code: "FORBIDDEN"
+            },
+            { status: 403 }
+          );
+        } else {
+          // 页面路由，重定向到首页并显示错误提示
+          const homeUrl = new URL("/", request.url);
+          homeUrl.searchParams.set("error", "admin_only");
+          return NextResponse.redirect(homeUrl);
+        }
       }
     }
 

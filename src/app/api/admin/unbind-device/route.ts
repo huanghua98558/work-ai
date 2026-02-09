@@ -169,6 +169,21 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("解绑设备错误:", error);
 
+    // 处理权限错误
+    if (error.message === "未授权访问") {
+      return NextResponse.json(
+        { success: false, error: "未授权访问" },
+        { status: 401 }
+      );
+    }
+
+    if (error.message === "权限不足") {
+      return NextResponse.json(
+        { success: false, error: "权限不足，需要管理员权限" },
+        { status: 403 }
+      );
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: "请求参数错误", details: error.errors },
