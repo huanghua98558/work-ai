@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { z } from "zod";
+import { cache } from "@/lib/memory-cache";
 
 /**
  * 绑定机器人验证 Schema
@@ -29,10 +30,12 @@ const bindRobotSchema = z.object({
 /**
  * 获取用户的机器人列表
  * GET /api/robots
+ *
+ * 优化：
+ * 1. 使用窗口函数一次查询获取数据和总数
+ * 2. 使用内存缓存（5分钟）
  */
 export async function GET(request: NextRequest) {
-  const poolInstance = await getPool();
-  const client = await poolInstance.connect();
   try {
     const user = requireAuth(request);
 
@@ -42,53 +45,71 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
     const status = searchParams.get("status");
 
-    // 构建查询条件
-    const conditions: string[] = ["ur.user_id = $1"];
-    const params: any[] = [user.userId];
-    let paramIndex = 2;
+    // 生成缓存键
+    const cacheKey = `robots:user:${user.userId}:page:${page}:limit:${limit}:status:${status || 'all'}`;
 
-    if (status) {
-      conditions.push(`r.status = $${paramIndex++}`);
-      params.push(status);
-    }
+    // 使用缓存（5分钟）
+    const cachedData = await cache(cacheKey, async () => {
+      const poolInstance = await getPool();
+      const client = await poolInstance.connect();
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+      try {
+        // 构建查询条件
+        const conditions: string[] = ["ur.user_id = $1"];
+        const params: any[] = [user.userId];
+        let paramIndex = 2;
 
-    // 查询机器人总数
-    const countResult = await client.query(
-      `SELECT COUNT(*) as total
-       FROM user_robots ur
-       JOIN robots r ON ur.robot_id = r.bot_id
-       ${whereClause}`,
-      params
-    );
-    const total = parseInt(countResult.rows[0].total);
+        if (status) {
+          conditions.push(`r.status = $${paramIndex++}`);
+          params.push(status);
+        }
 
-    // 查询机器人列表
-    const query = `
-      SELECT
-        r.*,
-        ur.nickname as user_nickname,
-        ur.created_at as bound_at
-      FROM robots r
-      JOIN user_robots ur ON r.bot_id = ur.robot_id
-      ${whereClause}
-      ORDER BY ur.created_at DESC
-      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
-    `;
+        const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
-    params.push(limit, offset);
-    const result = await client.query(query, params);
+        // 使用窗口函数一次查询获取数据和总数
+        const query = `
+          SELECT
+            r.*,
+            ur.nickname as user_nickname,
+            ur.created_at as bound_at,
+            COUNT(*) OVER() as total_count
+          FROM robots r
+          JOIN user_robots ur ON r.bot_id = ur.robot_id
+          ${whereClause}
+          ORDER BY ur.created_at DESC
+          LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+        `;
+
+        params.push(limit, offset);
+        const result = await client.query(query);
+
+        // 从第一条记录获取总数
+        const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
+
+        // 移除 total_count 字段
+        const data = result.rows.map((row: any) => {
+          const { total_count, ...rest } = row;
+          return rest;
+        });
+
+        return {
+          data,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        };
+      } finally {
+        client.release();
+      }
+    }, 5 * 60 * 1000); // 5分钟缓存
 
     return NextResponse.json({
       success: true,
-      data: result.rows,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: cachedData.data,
+      pagination: cachedData.pagination,
     });
   } catch (error: any) {
     console.error("获取机器人列表错误:", error);
@@ -104,8 +125,6 @@ export async function GET(request: NextRequest) {
       { success: false, error: "获取机器人列表失败", details: error.message },
       { status: 500 }
     );
-  } finally {
-    client.release();
   }
 }
 
