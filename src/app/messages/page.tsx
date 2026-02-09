@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AdminLayout } from '@/components/layout/admin-layout';
+import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -143,7 +143,7 @@ export default function MessagesPage() {
   };
 
   return (
-    <AdminLayout>
+    <MainLayout>
       <div className="space-y-6">
         {/* 页面标题 */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 dark:from-blue-900 dark:via-cyan-900 dark:to-teal-900 p-8">
@@ -326,7 +326,7 @@ export default function MessagesPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminLayout>
+    </MainLayout>
   );
 }
 
