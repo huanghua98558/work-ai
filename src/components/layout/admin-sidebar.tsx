@@ -23,6 +23,7 @@ import {
   Code,
   HelpCircle,
   Download,
+  Sparkles,
 } from 'lucide-react';
 
 interface NavItem {
@@ -58,6 +59,7 @@ const navigation: NavItem[] = [
   // 设置和工具
   { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600', category: '设置与工具' },
   { name: '个人设置', href: '/profile', icon: User, gradient: 'from-blue-500 to-cyan-600', category: '设置与工具' },
+  { name: 'AI 助手', href: '/admin/ai', icon: Sparkles, gradient: 'from-emerald-500 to-teal-600', category: '设置与工具' },
   { name: '权限诊断', href: '/verify', icon: Shield, gradient: 'from-violet-500 to-purple-600', category: '设置与工具' },
   { name: '帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-rose-500 to-pink-600', category: '设置与工具' },
 ];

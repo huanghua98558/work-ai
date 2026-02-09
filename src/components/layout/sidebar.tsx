@@ -18,12 +18,14 @@ import {
   FileText,
   Shield,
   HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 
 const navigation = [
   { name: '首页', href: '/dashboard', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600', requireAdmin: false },
   { name: '我的机器人', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', requireAdmin: false },
   { name: '消息记录', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', requireAdmin: false },
+  { name: 'AI 对话', href: '/chat', icon: Sparkles, gradient: 'from-violet-500 to-purple-600', requireAdmin: false },
   { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', requireAdmin: false },
   { name: '个人设置', href: '/profile', icon: User, gradient: 'from-emerald-500 to-green-600', requireAdmin: false },
   { name: '管理后台', href: '/admin', icon: Shield, gradient: 'from-violet-500 to-purple-600', requireAdmin: true },
