@@ -37,9 +37,8 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  // 按照使用频率和重要性排序
+  // 按照用户要求的顺序
   { name: '仪表盘', href: '/admin', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600', category: '所有功能', requireAdmin: false },
-  { name: '用户管理', href: '/users', icon: Users, gradient: 'from-teal-500 to-green-600', category: '所有功能', requireAdmin: false },
   { name: '机器人管理', href: '/admin/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', category: '所有功能', requireAdmin: true },
   { name: '消息管理', href: '/admin/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', category: '所有功能', requireAdmin: true },
   { name: 'AI 助手', href: '/admin/ai', icon: Sparkles, gradient: 'from-emerald-500 to-teal-600', category: '所有功能', requireAdmin: false },
