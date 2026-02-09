@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { requireAuth, requireRole } from "@/lib/auth";
 
 /**
@@ -10,11 +10,18 @@ import { requireAuth, requireRole } from "@/lib/auth";
  * GET /api/admin/check-user?phone=xxx
  */
 export async function GET(request: NextRequest) {
-  const client = await pool.connect();
+  console.log('[CheckUser] 开始处理请求');
+
+  let client;
   try {
+    const poolInstance = await getPool();
+    client = await poolInstance.connect();
+    console.log('[CheckUser] 数据库连接成功');
+
     // 验证管理员权限
     const user = requireAuth(request);
     requireRole(user, ["admin"]);
+    console.log('[CheckUser] 权限验证通过:', { userId: user.userId, role: user.role });
 
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get("phone");
@@ -26,6 +33,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('[CheckUser] 查询用户:', phone);
+
     // 查询用户信息
     const userResult = await client.query(
       `SELECT id, phone, nickname, avatar, role, status, created_at, last_login_at
@@ -33,6 +42,8 @@ export async function GET(request: NextRequest) {
        WHERE phone = $1`,
       [phone]
     );
+
+    console.log('[CheckUser] 查询结果:', { found: userResult.rows.length > 0 });
 
     if (userResult.rows.length === 0) {
       return NextResponse.json(
@@ -55,7 +66,8 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("检查用户信息错误:", error);
+    console.error('[CheckUser] 错误:', error);
+    console.error('[CheckUser] 错误堆栈:', error.stack);
 
     if (error.message === "未授权访问") {
       return NextResponse.json(
@@ -76,6 +88,12 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   } finally {
-    client.release();
+    if (client) {
+      try {
+        client.release();
+      } catch (releaseError) {
+        console.error('[CheckUser] 释放连接失败:', releaseError);
+      }
+    }
   }
 }

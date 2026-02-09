@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
 /**
@@ -10,11 +10,17 @@ import { requireAuth } from "@/lib/auth";
  * GET /api/users/me
  */
 export async function GET(request: NextRequest) {
-  const client = await pool.connect();
+  console.log('[UsersMe] 开始处理请求');
+
+  let client;
   try {
     const user = requireAuth(request);
 
-    console.log('获取用户信息:', { userId: user.userId, phone: user.phone, role: user.role });
+    console.log('[UsersMe] 获取用户信息:', { userId: user.userId, phone: user.phone, role: user.role });
+
+    const poolInstance = await getPool();
+    client = await poolInstance.connect();
+    console.log('[UsersMe] 数据库连接成功');
 
     // 查询用户详细信息
     const userResult = await client.query(
@@ -36,7 +42,8 @@ export async function GET(request: NextRequest) {
       data: userResult.rows[0],
     });
   } catch (error: any) {
-    console.error("获取用户信息错误:", error);
+    console.error("[UsersMe] 获取用户信息错误:", error);
+    console.error("[UsersMe] 错误堆栈:", error.stack);
 
     if (error.message === "未授权访问") {
       return NextResponse.json(
@@ -50,6 +57,12 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   } finally {
-    client.release();
+    if (client) {
+      try {
+        client.release();
+      } catch (releaseError) {
+        console.error('[UsersMe] 释放连接失败:', releaseError);
+      }
+    }
   }
 }
