@@ -14,8 +14,13 @@ const RETRY_DELAY = 1000; // 1秒
 
 // 从环境变量获取数据库连接字符串
 function getConnectionString(): string {
-  // 加载环境变量（使用 path 确保从正确的目录加载）
-  config({ path: '.env' });
+  // 尝试加载 .env 文件（本地开发环境）
+  // Coze 平台等云平台会直接将环境变量注入到 process.env 中
+  try {
+    config({ path: '.env' });
+  } catch (error) {
+    // 忽略 .env 文件不存在或读取失败的情况
+  }
 
   const connectionString = process.env.PGDATABASE_URL || process.env.DATABASE_URL;
 

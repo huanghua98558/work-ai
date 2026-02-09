@@ -5,8 +5,15 @@ import next from 'next';
 import { initializeWebSocketServer } from './src/server/websocket-server-v3';
 import { cleanupZombieProcesses, getSystemStats } from './src/lib/process-cleanup';
 
-// 首先加载环境变量
-config();
+// 首先加载环境变量（仅在 .env 文件存在时加载）
+// Coze 平台等云平台会直接将环境变量注入到 process.env 中
+// 本地开发可以使用 .env 文件
+try {
+  config({ path: '.env' });
+} catch (error) {
+  // 忽略 .env 文件不存在或读取失败的情况
+  // 环境变量可能已经由平台注入
+}
 
 // 增加 Node.js 内存限制（防止 OOM）
 if (process.env.NODE_OPTIONS === undefined) {

@@ -125,7 +125,20 @@ export function validateEnv(): Env {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
       console.error('');
-      console.error('请检查 .env 文件或环境变量配置');
+      console.error('配置方式：');
+      console.error('');
+      console.error('📖 本地开发：');
+      console.error('  在项目根目录创建 .env 文件并配置以上环境变量');
+      console.error('');
+      console.error('☁️  Coze 平台部署：');
+      console.error('  1. 进入 Coze 平台项目设置');
+      console.error('  2. 找到"环境变量"或"Secrets"配置页面');
+      console.error('  3. 添加以下必需的环境变量：');
+      console.error('     - DATABASE_URL: PostgreSQL 数据库连接字符串');
+      console.error('     - JWT_SECRET: 至少 32 个字符的随机密钥');
+      console.error('  4. 保存配置并重新部署');
+      console.error('');
+      console.error('📚 详细配置指南请查看：COZE_ENV_SETUP.md');
     } else {
       console.error('❌ 环境变量验证失败:', error instanceof Error ? error.message : error);
     }
