@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
 
       // 返回用户信息和 Token
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         data: {
           token,
@@ -103,6 +103,16 @@ export async function POST(request: NextRequest) {
         },
         timestamp: new Date().toISOString(),
       });
+
+      // 设置 Cookie
+      response.cookies.set('accessToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60, // 30 天
+      });
+
+      return response;
     } finally {
       client.release();
     }
