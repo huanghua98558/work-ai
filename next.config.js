@@ -2,9 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // 输出模式
-  output: 'standalone',
-
   // 文件跟踪根目录（解决多 lockfile 警告）
   outputFileTracingRoot: process.cwd(),
 
