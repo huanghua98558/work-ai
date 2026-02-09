@@ -6,7 +6,7 @@ build = ["pnpm", "install"]
 run = ["pnpm", "run", "dev"]
 
 [deploy]
-build = ["bash", "-c", "bash scripts/check-env.sh && bash scripts/deploy-build.sh"]
+build = ["bash", "scripts/deploy-build.sh"]
 run = ["bash", "scripts/start.sh"]
 
 [env]
