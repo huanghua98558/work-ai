@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { MainLayout } from '@/components/layout/main-layout';
+import { AdminLayout } from '@/components/layout/admin-layout';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -199,7 +199,7 @@ export default function MonitorPage() {
   };
 
   return (
-    <MainLayout>
+    <AdminLayout>
       <div className="space-y-6">
         {/* 页面标题 - 使用渐变背景 */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 dark:from-teal-900 dark:via-cyan-900 dark:to-blue-900 p-8">
@@ -528,6 +528,6 @@ export default function MonitorPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
+    </AdminLayout>
   );
 }

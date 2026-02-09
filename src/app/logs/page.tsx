@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { MainLayout } from '@/components/layout/main-layout';
+import { AdminLayout } from '@/components/layout/admin-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -262,7 +262,7 @@ export default function LogsPage() {
   };
 
   return (
-    <MainLayout>
+    <AdminLayout>
       <div className="container mx-auto px-4 py-6">
         {/* 统计卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
@@ -596,6 +596,6 @@ export default function LogsPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
+    </AdminLayout>
   );
 }
