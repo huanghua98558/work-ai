@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useUserRole } from '@/hooks/use-user-role';
 import {
   LayoutDashboard,
   Key,
@@ -18,21 +19,22 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600' },
-  { name: '激活码管理', href: '/activation-codes', icon: Key, gradient: 'from-green-500 to-emerald-600' },
-  { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600' },
-  { name: '消息中心', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600' },
-  { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600' },
-  { name: 'WebSocket', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600' },
-  { name: '日志管理', href: '/logs', icon: FileText, gradient: 'from-indigo-500 to-blue-600' },
-  { name: '系统监控', href: '/admin/errors', icon: Activity, gradient: 'from-orange-500 to-red-600' },
-  { name: '用户管理', href: '/users', icon: User, gradient: 'from-teal-500 to-green-600' },
-  { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600' },
-  { name: '帮助文档', href: '/help', icon: Activity, gradient: 'from-rose-500 to-pink-600' },
+  { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600', requireAdmin: false },
+  { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', requireAdmin: false },
+  { name: '消息中心', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', requireAdmin: false },
+  { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', requireAdmin: false },
+  { name: '激活码管理', href: '/activation-codes', icon: Key, gradient: 'from-green-500 to-emerald-600', requireAdmin: true },
+  { name: 'WebSocket', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600', requireAdmin: true },
+  { name: '日志管理', href: '/logs', icon: FileText, gradient: 'from-indigo-500 to-blue-600', requireAdmin: true },
+  { name: '系统监控', href: '/admin/errors', icon: Activity, gradient: 'from-orange-500 to-red-600', requireAdmin: true },
+  { name: '用户管理', href: '/users', icon: User, gradient: 'from-teal-500 to-green-600', requireAdmin: true },
+  { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600', requireAdmin: true },
+  { name: '帮助文档', href: '/help', icon: Activity, gradient: 'from-rose-500 to-pink-600', requireAdmin: true },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { isAdmin, loading } = useUserRole();
 
   return (
     <div className="flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-white border-r border-slate-800">
@@ -50,9 +52,18 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-2 overflow-y-auto p-4">
-        {navigation.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+        {navigation
+          .filter((item) => {
+            // 如果正在加载，显示所有菜单项
+            if (loading) return true;
+            // 如果是管理员，显示所有菜单项
+            if (isAdmin) return true;
+            // 如果是普通用户，只显示不需要管理员权限的菜单项
+            return !item.requireAdmin;
+          })
+          .map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
 
           return (
             <Link

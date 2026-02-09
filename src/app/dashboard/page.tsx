@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { useUserRole } from '@/hooks/use-user-role'
 import {
   Bot,
   Key,
@@ -78,6 +79,7 @@ const setCachedData = <T,>(key: string, data: T): void => {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { isAdmin } = useUserRole()
   const [stats, setStats] = useState({
     totalRobots: 0,
     totalActivationCodes: 0,
@@ -395,26 +397,43 @@ export default function DashboardPage() {
             icon={Users}
             gradient="from-pink-500 to-pink-600"
           />
-
-          <StatCard
-            title="响应速度"
-            value="N/A"
-            description="暂未统计"
-            icon={Clock}
-            gradient="from-cyan-500 to-cyan-600"
-          />
-
-          <StatCard
-            title="WebSocket 连接"
-            value={websocketData.totalConnections}
-            description={websocketData.serverStatus === 'running' ? '服务运行中' : '服务未运行'}
-            icon={websocketData.serverStatus === 'running' ? Wifi : WifiOff}
-            gradient={websocketData.serverStatus === 'running' ? 'from-emerald-500 to-emerald-600' : 'from-gray-500 to-gray-600'}
-          />
         </div>
 
-        {/* WebSocket 连接详情 */}
-        {websocketData.totalConnections > 0 && (
+        {/* 激活码统计卡片 - 仅管理员可见 */}
+        {isAdmin && (
+          <StatCard
+            title="激活码数量"
+            value={stats.totalActivationCodes}
+            description={`${stats.unusedActivationCodes} 未使用 · ${stats.usedActivationCodes} 已使用`}
+            icon={Key}
+            gradient="from-green-500 to-green-600"
+          />
+        )}
+
+        {/* WebSocket 统计卡片 - 仅管理员可见 */}
+        {isAdmin && (
+          <>
+            <StatCard
+              title="响应速度"
+              value="N/A"
+              description="暂未统计"
+              icon={Clock}
+              gradient="from-cyan-500 to-cyan-600"
+            />
+
+            <StatCard
+              title="WebSocket 连接"
+              value={websocketData.totalConnections}
+              description={websocketData.serverStatus === 'running' ? '服务运行中' : '服务未运行'}
+              icon={websocketData.serverStatus === 'running' ? Wifi : WifiOff}
+              gradient={websocketData.serverStatus === 'running' ? 'from-emerald-500 to-emerald-600' : 'from-gray-500 to-gray-600'}
+            />
+          </>
+        )}
+        </div>
+
+        {/* WebSocket 连接详情 - 仅管理员可见 */}
+        {isAdmin && websocketData.totalConnections > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -462,13 +481,15 @@ export default function DashboardPage() {
             gradient="from-blue-500 to-indigo-600"
           />
 
-          <QuickActionCard
-            href="/activation-codes"
-            title="生成激活码"
-            description="创建和管理激活码"
-            icon={Key}
-            gradient="from-green-500 to-emerald-600"
-          />
+          {isAdmin && (
+            <QuickActionCard
+              href="/activation-codes"
+              title="生成激活码"
+              description="创建和管理激活码"
+              icon={Key}
+              gradient="from-green-500 to-emerald-600"
+            />
+          )}
 
           <QuickActionCard
             href="/knowledge"
@@ -487,24 +508,26 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* 快速操作第二行 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <WideQuickActionCard
-            href="/users"
-            title="用户管理"
-            description="管理系统用户和权限"
-            icon={Users}
-            gradient="from-rose-500 via-pink-600 to-red-600"
-          />
+        {/* 快速操作第二行 - 仅管理员可见 */}
+        {isAdmin && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <WideQuickActionCard
+              href="/users"
+              title="用户管理"
+              description="管理系统用户和权限"
+              icon={Users}
+              gradient="from-rose-500 via-pink-600 to-red-600"
+            />
 
-          <WideQuickActionCard
-            href="/settings"
-            title="系统设置"
-            description="配置系统参数和选项"
-            icon={Settings}
-            gradient="from-cyan-500 via-teal-600 to-green-600"
-          />
-        </div>
+            <WideQuickActionCard
+              href="/settings"
+              title="系统设置"
+              description="配置系统参数和选项"
+              icon={Settings}
+              gradient="from-cyan-500 via-teal-600 to-green-600"
+            />
+          </div>
+        )}
 
         {/* 最近对话、活跃机器人和最近激活码 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -621,90 +644,92 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* 最近激活码 */}
-          <Card className="border-2 border-green-100 dark:border-green-900">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Key className="h-5 w-5 text-green-600" />
-                    最近激活码
-                  </CardTitle>
-                  <CardDescription>最近生成或使用的激活码</CardDescription>
+          {/* 最近激活码 - 仅管理员可见 */}
+          {isAdmin && (
+            <Card className="border-2 border-green-100 dark:border-green-900">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Key className="h-5 w-5 text-green-600" />
+                      最近激活码
+                    </CardTitle>
+                    <CardDescription>最近生成或使用的激活码</CardDescription>
+                  </div>
+                  <Link href="/activation-codes">
+                    <Button variant="ghost" size="sm" className="text-green-600">
+                      查看全部
+                      <ArrowUpRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
                 </div>
-                <Link href="/activation-codes">
-                  <Button variant="ghost" size="sm" className="text-green-600">
-                    查看全部
-                    <ArrowUpRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>激活码</TableHead>
-                    <TableHead>机器人</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>时间</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentActivationCodes && recentActivationCodes.length > 0 ? (
-                    recentActivationCodes.map((code) => (
-                      <TableRow key={code.id}>
-                        <TableCell className="font-mono text-sm">{code.code}</TableCell>
-                        <TableCell>
-                          <div>
-                            {code.robotName ? (
-                              <div className="text-sm font-medium">{code.robotName}</div>
-                            ) : (
-                              <span className="text-gray-400 text-sm">-</span>
-                            )}
-                            {code.robotId && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {code.robotId}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={code.status === 'unused' ? 'default' : 'secondary'}
-                            className={
-                              code.status === 'unused'
-                                ? 'bg-green-500'
-                                : code.status === 'used'
-                                ? 'bg-blue-500'
-                                : code.status === 'expired'
-                                ? 'bg-red-500'
-                                : 'bg-gray-500'
-                            }
-                          >
-                            {code.status === 'unused'
-                              ? '未使用'
-                              : code.status === 'used'
-                              ? '已使用'
-                              : code.status === 'expired'
-                              ? '已过期'
-                              : '已禁用'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{code.timeAgo}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
+              </CardHeader>
+              <CardContent className="p-6">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-gray-500">
-                        暂无激活码
-                      </TableCell>
+                      <TableHead>激活码</TableHead>
+                      <TableHead>机器人</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>时间</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {recentActivationCodes && recentActivationCodes.length > 0 ? (
+                      recentActivationCodes.map((code) => (
+                        <TableRow key={code.id}>
+                          <TableCell className="font-mono text-sm">{code.code}</TableCell>
+                          <TableCell>
+                            <div>
+                              {code.robotName ? (
+                                <div className="text-sm font-medium">{code.robotName}</div>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                              {code.robotId && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {code.robotId}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={code.status === 'unused' ? 'default' : 'secondary'}
+                              className={
+                                code.status === 'unused'
+                                  ? 'bg-green-500'
+                                  : code.status === 'used'
+                                  ? 'bg-blue-500'
+                                  : code.status === 'expired'
+                                  ? 'bg-red-500'
+                                  : 'bg-gray-500'
+                              }
+                            >
+                              {code.status === 'unused'
+                                ? '未使用'
+                                : code.status === 'used'
+                                ? '已使用'
+                                : code.status === 'expired'
+                                ? '已过期'
+                                : '已禁用'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{code.timeAgo}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-gray-500">
+                          暂无激活码
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* 使用趋势 - 使用渐变背景 */}
@@ -733,8 +758,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* WebSocket 监控板块 */}
-        <Card className="border-2 border-yellow-100 dark:border-yellow-900">
+        {/* WebSocket 监控板块 - 仅管理员可见 */}
+        {isAdmin && (
+          <Card className="border-2 border-yellow-100 dark:border-yellow-900">
           <CardHeader className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20">
             <div className="flex items-center justify-between">
               <div>
@@ -837,9 +863,11 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
-        {/* 系统监控面板 */}
-        <Card className="border-2 border-red-100 dark:border-red-900">
+        {/* 系统监控面板 - 仅管理员可见 */}
+        {isAdmin && (
+          <Card className="border-2 border-red-100 dark:border-red-900">
           <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
             <div className="flex items-center justify-between">
               <div>
@@ -957,6 +985,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* 平台支持卡片 */}
         <Card className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white border-0">
