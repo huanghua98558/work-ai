@@ -35,13 +35,26 @@ import {
 export default function DashboardPage() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [userRole, setUserRole] = useState<string>('')
 
   useEffect(() => {
     setMounted(true)
     // 检查是否已登录
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken')
     if (!token) {
       router.push('/login')
+      return
+    }
+
+    // 获取用户角色
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        setUserRole(user.role || '')
+      } catch (e) {
+        console.error('解析用户信息失败:', e)
+      }
     }
   }, [router])
 
@@ -78,6 +91,15 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {/* 管理员入口 */}
+                {userRole === 'admin' && (
+                  <Link href="/admin">
+                    <Button variant="ghost" size="sm" className="rounded-full gap-2">
+                      <Shield className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                      <span className="text-sm">管理后台</span>
+                    </Button>
+                  </Link>
+                )}
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Search className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                 </Button>

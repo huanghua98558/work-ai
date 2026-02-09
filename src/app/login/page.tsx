@@ -34,10 +34,23 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (data.success) {
-        // 使用新的 saveAuthData 保存 Token
-        // saveAuthData(data.data)
-        // 跳转到首页或控制台
-        router.push('/dashboard')
+        // 保存 Token 到 localStorage
+        if (typeof window !== 'undefined') {
+          const { accessToken, refreshToken, token, user } = data.data;
+          localStorage.setItem('accessToken', accessToken || token);
+          localStorage.setItem('refreshToken', refreshToken);
+          localStorage.setItem('token', accessToken || token);
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        // 根据用户角色跳转到不同的页面
+        if (data.data.user && data.data.user.role === 'admin') {
+          // 管理员跳转到管理后台
+          router.push('/admin');
+        } else {
+          // 普通用户跳转到控制台
+          router.push('/dashboard');
+        }
       } else {
         setError(data.error || '登录失败')
       }
