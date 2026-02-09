@@ -85,7 +85,7 @@ export default function LogsPage() {
   // 获取 Token
   const getToken = () => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('auth_token');
+    return localStorage.getItem('token') || localStorage.getItem('accessToken');
   };
 
   // 获取日志
