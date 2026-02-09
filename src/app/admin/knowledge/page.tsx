@@ -86,13 +86,13 @@ export default function AdminKnowledgePage() {
       setLoading(true);
       const response = await apiClient.get(`/api/knowledge-bases?page=${page}&limit=20`);
 
-      if (response.data.success) {
-        setKnowledgeBases(response.data.data);
+      if (response.success) {
+        setKnowledgeBases(response.data);
         setTotal(response.data.pagination.total);
       } else {
         toast({
           title: "加载失败",
-          description: response.data.error || "加载知识库列表失败",
+          description: response.error || "加载知识库列表失败",
           variant: "destructive",
         });
       }
@@ -126,7 +126,7 @@ export default function AdminKnowledgePage() {
       setCreating(true);
       const response = await apiClient.post('/api/knowledge-bases', createKbForm);
 
-      if (response.data.success) {
+      if (response.success) {
         toast({
           title: "创建成功",
           description: "知识库创建成功",
@@ -142,7 +142,7 @@ export default function AdminKnowledgePage() {
       } else {
         toast({
           title: "创建失败",
-          description: response.data.error || "创建知识库失败",
+          description: response.error || "创建知识库失败",
           variant: "destructive",
         });
       }
@@ -165,7 +165,7 @@ export default function AdminKnowledgePage() {
       setSaving(true);
       const response = await apiClient.put(`/api/knowledge-bases/${editingKb.id}`, editKbForm);
 
-      if (response.data.success) {
+      if (response.success) {
         toast({
           title: "更新成功",
           description: "知识库更新成功",
@@ -176,7 +176,7 @@ export default function AdminKnowledgePage() {
       } else {
         toast({
           title: "更新失败",
-          description: response.data.error || "更新知识库失败",
+          description: response.error || "更新知识库失败",
           variant: "destructive",
         });
       }
@@ -200,7 +200,7 @@ export default function AdminKnowledgePage() {
     try {
       const response = await apiClient.delete(`/api/knowledge-bases/${kbId}`);
       
-      if (response.data.success) {
+      if (response.success) {
         toast({
           title: "删除成功",
           description: "知识库删除成功",
@@ -209,7 +209,7 @@ export default function AdminKnowledgePage() {
       } else {
         toast({
           title: "删除失败",
-          description: response.data.error || "删除知识库失败",
+          description: response.error || "删除知识库失败",
           variant: "destructive",
         });
       }

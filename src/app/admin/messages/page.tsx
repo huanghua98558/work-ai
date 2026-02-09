@@ -66,12 +66,12 @@ export default function AdminMessagesPage() {
       setLoadingRobots(true);
       const response = await apiClient.get('/api/robots');
 
-      if (response.data.success) {
-        setRobots(response.data.data);
+      if (response.success) {
+        setRobots(response.data);
 
         // 如果有机器人，自动选择第一个
-        if (response.data.data.length > 0 && !selectedRobotId) {
-          setSelectedRobotId(response.data.data[0].robot_id);
+        if (response.data.length > 0 && !selectedRobotId) {
+          setSelectedRobotId(response.data[0].robot_id);
         }
       }
     } catch (error: any) {
@@ -105,9 +105,9 @@ export default function AdminMessagesPage() {
         },
       });
 
-      if (response.data.success) {
-        setMessages(response.data.data.messages || []);
-        setTotal(response.data.data.pagination.total);
+      if (response.success) {
+        setMessages(response.data.messages || []);
+        setTotal(response.data.pagination.total);
       }
     } catch (error: any) {
       console.error('加载消息列表失败:', error);
@@ -154,8 +154,8 @@ export default function AdminMessagesPage() {
         },
       });
 
-      if (response.data.success) {
-        const data = response.data.data.messages;
+      if (response.success) {
+        const data = response.data.messages;
         const csv = [
           ['时间', '方向', '用户ID', '消息内容', '状态'].join(','),
           ...data.map((msg: Message) => [

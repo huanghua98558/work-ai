@@ -52,12 +52,12 @@ export default function AdminRobotsPage() {
       setRefreshing(true);
       const response = await apiClient.get('/api/robots');
 
-      if (response.data.success && response.data.data) {
-        setRobots(response.data.data);
+      if (response.success && response.data) {
+        setRobots(response.data);
       } else {
         toast({
           title: "加载失败",
-          description: response.data.error || "加载机器人列表失败",
+          description: response.error || "加载机器人列表失败",
           variant: "destructive",
         });
       }

@@ -68,13 +68,13 @@ export default function AuditLogsPage() {
         },
       });
 
-      if (response.data.success) {
-        setLogs(response.data.data);
-        setTotal(response.data.pagination.total);
+      if (response.success) {
+        setLogs(response.data);
+        setTotal(response.pagination.total);
       } else {
         toast({
           title: "加载失败",
-          description: response.data.error || "加载审计日志失败",
+          description: response.error || "加载审计日志失败",
           variant: "destructive",
         });
       }

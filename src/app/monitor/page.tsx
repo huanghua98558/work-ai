@@ -118,10 +118,10 @@ export default function MonitorPage() {
 
   const loadHealth = async () => {
     try {
-      const response = await apiClient.get<{ data: HealthStatus; issues: string[] }>('/api/monitor/health');
-      if (response.data) {
-        setHealth(response.data.data);
-        setIssues(response.data.issues || []);
+      const response = await apiClient.get('/api/monitor/health');
+      if (response.success) {
+        setHealth(response.data);
+        setIssues(response.issues || []);
       }
     } catch (error) {
       console.error('加载健康状态失败:', error);
