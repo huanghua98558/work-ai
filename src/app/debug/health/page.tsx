@@ -44,6 +44,15 @@ export default function SystemHealthCheckPage() {
       setLoading(true);
       setError(null);
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       // 1. 检查数据库连接
       const healthRes = await fetch('/api/health');
       if (!healthRes.ok) throw new Error('健康检查失败');
@@ -55,7 +64,7 @@ export default function SystemHealthCheckPage() {
       });
 
       // 2. 获取管理员账号列表
-      const usersRes = await fetch('/api/users/admins');
+      const usersRes = await fetch('/api/users/admins', { headers });
       if (!usersRes.ok) throw new Error('获取管理员账号失败');
       const usersData = await usersRes.json();
       setAdminUsers(usersData.admins || []);

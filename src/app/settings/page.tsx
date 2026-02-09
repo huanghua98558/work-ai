@@ -73,7 +73,16 @@ export default function SettingsPage() {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/settings/config');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/settings/config', { headers });
       if (response.ok) {
         const data = await response.json();
         setConfig(data);
@@ -88,9 +97,18 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/settings/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(config),
       });
       if (response.ok) {

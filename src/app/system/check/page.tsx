@@ -43,8 +43,16 @@ export default function SystemCheckPage() {
     setReport(null);
 
     try {
+      const headers: HeadersInit = {};
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/system/check', {
         cache: 'no-store',
+        headers,
       });
 
       if (!response.ok) {
