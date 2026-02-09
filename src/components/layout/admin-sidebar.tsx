@@ -51,9 +51,10 @@ const navigation: NavItem[] = [
   { name: '系统监控', href: '/monitor', icon: MonitorPlay, gradient: 'from-rose-500 to-red-600', category: '所有功能', requireAdmin: true },
   { name: 'WebSocket', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600', category: '所有功能', requireAdmin: true },
   { name: '权限诊断', href: '/verify', icon: Shield, gradient: 'from-violet-500 to-purple-600', category: '所有功能', requireAdmin: false },
+  { name: '用户管理', href: '/users', icon: Users, gradient: 'from-teal-500 to-green-600', category: '所有功能', requireAdmin: false },
   { name: '个人设置', href: '/profile', icon: User, gradient: 'from-blue-500 to-cyan-600', category: '所有功能', requireAdmin: false },
   { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600', category: '所有功能', requireAdmin: false },
-  { name: '帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-slate-500 to-gray-600', category: '所有功能', requireAdmin: false },
+  { name: '帮助中心', href: '/help', icon: HelpCircle, gradient: 'from-slate-500 to-gray-600', category: '所有功能', requireAdmin: false },
 ];
 
 export function AdminSidebar() {
