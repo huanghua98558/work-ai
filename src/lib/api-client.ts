@@ -159,8 +159,22 @@ export class ApiClient {
     }
   }
 
-  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' });
+  async get<T>(endpoint: string, options?: { params?: Record<string, any> }): Promise<ApiResponse<T>> {
+    let url = endpoint;
+    // 如果有 params 参数，构建查询字符串
+    if (options?.params) {
+      const queryParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+      const queryString = queryParams.toString();
+      if (queryString) {
+        url += (endpoint.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+    return this.request<T>(url, { method: 'GET' });
   }
 
   async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { MainLayout } from '@/components/layout/main-layout';
+import { AdminLayout } from '@/components/layout/admin-layout';
 import {
   BookOpen,
   MessageSquare,
@@ -355,7 +355,7 @@ export default function HelpPage() {
   ) || [];
 
   return (
-    <MainLayout>
+    <AdminLayout>
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* 页面标题 */}
         <div className="flex items-center justify-between">
@@ -537,6 +537,6 @@ export default function HelpPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
+    </AdminLayout>
   );
 }

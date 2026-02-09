@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MainLayout } from '@/components/layout/main-layout';
+import { AdminLayout } from '@/components/layout/admin-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,16 +139,16 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <MainLayout>
+      <AdminLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
         </div>
-      </MainLayout>
+      </AdminLayout>
     );
   }
 
   return (
-    <MainLayout>
+    <AdminLayout>
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* 页面标题 */}
         <div className="flex items-center justify-between">
@@ -499,6 +499,6 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
+    </AdminLayout>
   );
 }

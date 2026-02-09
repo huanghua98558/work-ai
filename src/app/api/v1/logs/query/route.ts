@@ -34,17 +34,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = parseInt(searchParams.get('pageSize') || '50', 10);
 
-    // 验证必需参数
-    if (!robotId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: '参数错误',
-          error: 'robotId 是必需的',
-        },
-        { status: 400 }
-      );
-    }
+    // 验证必需参数（robotId 改为可选）
+    // 如果不提供 robotId，则查询所有机器人的日志
+    // const robotId = searchParams.get('robotId');
 
     // 验证 Token
     const authHeader = request.headers.get('authorization');
@@ -66,7 +58,12 @@ export async function GET(request: NextRequest) {
     const db = await getDatabase();
 
     // 构建查询条件
-    const conditions = [eq(logs.robotId, robotId)];
+    const conditions: any[] = [];
+
+    // robotId 可选：如果不提供，则查询所有机器人的日志
+    if (robotId) {
+      conditions.push(eq(logs.robotId, robotId));
+    }
 
     if (level !== null && level !== undefined && level !== '') {
       conditions.push(eq(logs.level, parseInt(level, 10)));

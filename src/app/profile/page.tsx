@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { MainLayout } from '@/components/layout/main-layout';
+import { AdminLayout } from '@/components/layout/admin-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -222,16 +222,16 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <MainLayout>
+      <AdminLayout>
         <div className="flex items-center justify-center h-full">
           <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      </MainLayout>
+      </AdminLayout>
     );
   }
 
   return (
-    <MainLayout>
+    <AdminLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* 页面标题 */}
         <div>
@@ -462,6 +462,6 @@ export default function ProfilePage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
+    </AdminLayout>
   );
 }
