@@ -1,5 +1,3 @@
-import { getAuthHeaders } from '@/hooks/use-user-role';
-
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -44,7 +42,21 @@ export class ApiClient {
   }
 
   getToken(): string | null {
-    return this.token;
+    // 每次都重新从 localStorage 读取，确保获取最新的 token
+    if (!isClient) {
+      return this.token;
+    }
+
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      if (token) {
+        this.token = token;
+      }
+      return this.token;
+    } catch (error) {
+      console.error('[ApiClient] 获取 Token 失败:', error);
+      return null;
+    }
   }
 
   removeToken() {
@@ -73,8 +85,11 @@ export class ApiClient {
     // 只在客户端添加认证头
     if (isClient) {
       try {
-        const authHeaders = getAuthHeaders();
-        Object.assign(headers, authHeaders);
+        // 每次都重新获取最新的 token
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
       } catch (error) {
         console.error('[ApiClient] 获取认证头失败:', error);
       }
