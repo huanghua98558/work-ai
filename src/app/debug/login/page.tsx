@@ -40,9 +40,11 @@ export default function DebugLoginPage() {
       }
 
       // 检查用户信息
+      const token = localStorage.getItem('token');
       const meResponse = await fetch('/api/users/me', {
         headers: {
-          'Cookie': document.cookie,
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
       });
 
