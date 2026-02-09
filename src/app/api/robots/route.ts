@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         `;
 
         params.push(limit, offset);
-        const result = await client.query(query);
+        const result = await client.query(query, params);
 
         // 从第一条记录获取总数
         const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
