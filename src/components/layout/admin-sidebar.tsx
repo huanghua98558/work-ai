@@ -34,31 +34,31 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  // 核心功能
+  // 核心功能 - 可访问的功能
   { name: '仪表盘', href: '/admin', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600', category: '核心功能' },
-  { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', category: '核心功能' },
-  { name: '消息中心', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', category: '核心功能' },
-  { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', category: '核心功能' },
+  { name: '用户管理', href: '/users', icon: Users, gradient: 'from-teal-500 to-green-600', category: '核心功能' },
 
-  // 用户功能
-  { name: '用户管理', href: '/users', icon: Users, gradient: 'from-teal-500 to-green-600', category: '用户管理' },
-  { name: '会话管理', href: '/sessions', icon: MessageSquare, gradient: 'from-amber-500 to-orange-600', category: '用户管理' },
-
-  // 系统管理
+  // 系统管理 - 仅管理员
   { name: '激活码管理', href: '/activation-codes', icon: Key, gradient: 'from-green-500 to-emerald-600', category: '系统管理', requireAdmin: true },
+  { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', category: '系统管理', requireAdmin: true },
   { name: '系统监控', href: '/monitor', icon: MonitorPlay, gradient: 'from-rose-500 to-red-600', category: '系统管理', requireAdmin: true },
-  { name: 'WebSocket 监控', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600', category: '系统管理', requireAdmin: true },
-  { name: '日志管理', href: '/logs', icon: FileText, gradient: 'from-indigo-500 to-blue-600', category: '系统管理', requireAdmin: true },
-  { name: '错误监控', href: '/admin/errors', icon: Activity, gradient: 'from-orange-500 to-red-600', category: '系统管理', requireAdmin: true },
+  { name: '审计日志', href: '/audit-logs', icon: FileText, gradient: 'from-indigo-500 to-blue-600', category: '系统管理', requireAdmin: true },
+
+  // 数据管理 - 仅管理员
+  { name: '消息管理', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', category: '数据管理', requireAdmin: true },
+  { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', category: '数据管理', requireAdmin: true },
+  { name: '数据导出', href: '/export', icon: Download, gradient: 'from-amber-500 to-orange-600', category: '数据管理', requireAdmin: true },
+
+  // 监控工具 - 仅管理员
+  { name: 'WebSocket', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600', category: '监控工具', requireAdmin: true },
+  { name: '日志管理', href: '/logs', icon: FileText, gradient: 'from-slate-500 to-gray-600', category: '监控工具', requireAdmin: true },
+  { name: '错误监控', href: '/admin/errors', icon: Activity, gradient: 'from-red-500 to-rose-600', category: '监控工具', requireAdmin: true },
 
   // 设置和工具
   { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600', category: '设置与工具' },
+  { name: '个人设置', href: '/profile', icon: User, gradient: 'from-blue-500 to-cyan-600', category: '设置与工具' },
   { name: '权限诊断', href: '/verify', icon: Shield, gradient: 'from-violet-500 to-purple-600', category: '设置与工具' },
   { name: '帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-rose-500 to-pink-600', category: '设置与工具' },
-
-  // 开发工具
-  { name: '调试工具', href: '/debug/login', icon: Code, gradient: 'from-gray-500 to-slate-600', category: '开发工具', requireAdmin: true },
-  { name: '健康检查', href: '/debug/health', gradient: 'from-emerald-500 to-teal-600', category: '开发工具', requireAdmin: true },
 ];
 
 export function AdminSidebar() {

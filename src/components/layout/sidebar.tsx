@@ -19,17 +19,13 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600', requireAdmin: false },
-  { name: '机器人管理', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', requireAdmin: false },
-  { name: '消息中心', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', requireAdmin: false },
+  { name: '首页', href: '/dashboard', icon: LayoutDashboard, gradient: 'from-blue-500 to-indigo-600', requireAdmin: false },
+  { name: '我的机器人', href: '/robots', icon: Bot, gradient: 'from-purple-500 to-violet-600', requireAdmin: false },
+  { name: '消息记录', href: '/messages', icon: MessageSquare, gradient: 'from-cyan-500 to-blue-600', requireAdmin: false },
   { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', requireAdmin: false },
-  { name: '激活码管理', href: '/activation-codes', icon: Key, gradient: 'from-green-500 to-emerald-600', requireAdmin: true },
-  { name: 'WebSocket', href: '/websocket', icon: Wifi, gradient: 'from-yellow-500 to-amber-600', requireAdmin: true },
-  { name: '日志管理', href: '/logs', icon: FileText, gradient: 'from-indigo-500 to-blue-600', requireAdmin: true },
-  { name: '系统监控', href: '/admin/errors', icon: Activity, gradient: 'from-orange-500 to-red-600', requireAdmin: true },
-  { name: '用户管理', href: '/users', icon: User, gradient: 'from-teal-500 to-green-600', requireAdmin: true },
-  { name: '系统设置', href: '/settings', icon: Settings, gradient: 'from-indigo-500 to-purple-600', requireAdmin: true },
-  { name: '帮助文档', href: '/help', icon: Activity, gradient: 'from-rose-500 to-pink-600', requireAdmin: true },
+  { name: '个人设置', href: '/profile', icon: User, gradient: 'from-emerald-500 to-green-600', requireAdmin: false },
+  { name: '管理后台', href: '/admin', icon: Shield, gradient: 'from-violet-500 to-purple-600', requireAdmin: true },
+  { name: '帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-rose-500 to-pink-600', requireAdmin: false },
 ];
 
 export function Sidebar() {
