@@ -24,6 +24,11 @@ import {
   Globe,
   Wifi,
   WifiOff,
+  AlertCircle,
+  XCircle,
+  AlertTriangle,
+  Info,
+  CheckCircle2,
 } from 'lucide-react'
 
 // 缓存键常量
@@ -97,6 +102,18 @@ export default function DashboardPage() {
     totalConnections: 0,
     onlineRobots: [],
     serverStatus: 'unknown',
+  })
+  const [systemErrors, setSystemErrors] = useState<{
+    totalErrors: number;
+    recentErrors: Array<{
+      id: string;
+      level: 'error' | 'warn' | 'info';
+      message: string;
+      timestamp: string;
+    }>;
+  }>({
+    totalErrors: 0,
+    recentErrors: [],
   })
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
 
@@ -202,6 +219,29 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error('[仪表盘] 获取 WebSocket 数据失败:', error)
+      }
+
+      // 获取系统错误数据
+      try {
+        console.log('[仪表盘] 开始获取系统错误数据');
+        const errorsResponse = await fetch('/api/admin/errors?limit=10', { headers })
+        const errorsData = await errorsResponse.json()
+        if (errorsData.success) {
+          console.log('[仪表盘] 系统错误数据:', errorsData.data);
+          setSystemErrors({
+            totalErrors: errorsData.data.errors.length,
+            recentErrors: errorsData.data.errors.slice(0, 10).map((err: any) => ({
+              id: err.id,
+              level: err.level,
+              message: err.message,
+              timestamp: err.timestamp,
+            })),
+          })
+        } else {
+          console.error('[仪表盘] 系统错误 API 返回失败:', errorsData.error);
+        }
+      } catch (error) {
+        console.error('[仪表盘] 获取系统错误数据失败:', error)
       }
     } catch (error: any) {
       console.error('Failed to refresh data:', error)
@@ -792,6 +832,126 @@ export default function DashboardPage() {
                 <div className="text-center py-6 text-gray-500 dark:text-gray-400">
                   <WifiOff className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">暂无在线机器人</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 系统监控面板 */}
+        <Card className="border-2 border-red-100 dark:border-red-900">
+          <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  系统监控
+                </CardTitle>
+                <CardDescription>实时查看系统错误和警告日志</CardDescription>
+              </div>
+              <Link href="/admin/errors">
+                <Button variant="ghost" size="sm" className="text-red-600">
+                  查看详情
+                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* 错误统计 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">总错误数</div>
+                    <div className="text-sm font-semibold">{systemErrors.totalErrors}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">错误</div>
+                    <div className="text-sm font-semibold">
+                      {systemErrors.recentErrors.filter(e => e.level === 'error').length}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">警告</div>
+                    <div className="text-sm font-semibold">
+                      {systemErrors.recentErrors.filter(e => e.level === 'warn').length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 最近错误列表 */}
+              {systemErrors.recentErrors.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    最近错误日志
+                  </div>
+                  <div className="space-y-2">
+                    {systemErrors.recentErrors.slice(0, 5).map((error) => (
+                      <div
+                        key={error.id}
+                        className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            error.level === 'error'
+                              ? 'bg-red-100 dark:bg-red-900'
+                              : error.level === 'warn'
+                              ? 'bg-yellow-100 dark:bg-yellow-900'
+                              : 'bg-blue-100 dark:bg-blue-900'
+                          }`}
+                        >
+                          {error.level === 'error' ? (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          ) : error.level === 'warn' ? (
+                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                          ) : (
+                            <Info className="h-4 w-4 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {error.message}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(error.timestamp).toLocaleString('zh-CN')}
+                          </div>
+                        </div>
+                        <Badge
+                          variant={
+                            error.level === 'error'
+                              ? 'destructive'
+                              : error.level === 'warn'
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                        >
+                          {error.level.toUpperCase()}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                  <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-50 text-green-500" />
+                  <p className="text-sm">系统运行正常，暂无错误</p>
                 </div>
               )}
             </div>
