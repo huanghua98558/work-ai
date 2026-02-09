@@ -52,11 +52,11 @@ function getPoolConfig(): PoolConfig {
     max: maxConnections,
     min: minConnections,
 
-    // 空闲连接超时（10秒后回收空闲连接，减少内存占用）
-    idleTimeoutMillis: 10000,
+    // 空闲连接超时（5分钟后回收空闲连接，避免频繁创建连接）
+    idleTimeoutMillis: 300000,  // 从 10秒 改为 5分钟
 
-    // 连接超时（10秒）
-    connectionTimeoutMillis: 10000,
+    // 连接超时（5秒）
+    connectionTimeoutMillis: 5000,  // 从 10秒 改为 5秒
 
     // 查询超时（30秒）
     query_timeout: 30000,

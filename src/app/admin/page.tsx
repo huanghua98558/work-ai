@@ -86,9 +86,9 @@ export default function AdminPage() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 检查用户权限
+  // 检查用户权限并加载数据（并行化）
   useEffect(() => {
-    const checkUserPermission = async () => {
+    const loadAdminData = async () => {
       try {
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
         const headers: HeadersInit = {
@@ -99,26 +99,78 @@ export default function AdminPage() {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch('/api/users/me', { headers });
+        // 并行加载用户信息和统计数据
+        const [userResponse, statsResponse] = await Promise.all([
+          fetch('/api/users/me', { headers }),
+          fetch('/api/dashboard/stats', { headers })
+        ]);
 
-        if (!response.ok) {
-          if (response.status === 401) {
+        // 处理用户信息
+        if (!userResponse.ok) {
+          if (userResponse.status === 401) {
             router.push('/login?redirect=/admin');
             return;
           }
           throw new Error('获取用户信息失败');
         }
 
-        const data = await response.json();
-
-        if (data.success && data.data) {
-          const currentUser = data.data;
-          setUser(currentUser);
-          // 加载统计数据
-          loadStats();
+        const userData = await userResponse.json();
+        if (userData.success && userData.data) {
+          setUser(userData.data);
         }
+
+        // 处理统计数据
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          if (statsData.success && statsData.data) {
+            setStats(statsData.data.stats);
+
+            // 从最近机器人数据生成活动记录
+            const activities: RecentActivity[] = [];
+
+            if (statsData.data.recentRobots && statsData.data.recentRobots.length > 0) {
+              statsData.data.recentRobots.forEach((robot: any) => {
+                if (robot.status === 'online') {
+                  activities.push({
+                    id: robot.id,
+                    title: '机器人上线',
+                    description: `${robot.name} 已上线`,
+                    time: robot.lastActive,
+                    type: 'success',
+                  });
+                }
+              });
+            }
+
+            // 从最近激活码数据生成活动记录
+            if (statsData.data.recentActivationCodes && statsData.data.recentActivationCodes.length > 0) {
+              statsData.data.recentActivationCodes.forEach((code: any) => {
+                if (code.status === 'used') {
+                  activities.push({
+                    id: code.id,
+                    title: '激活码使用',
+                    description: `激活码 ${code.code} 已被使用`,
+                    time: code.timeAgo,
+                    type: 'success',
+                  });
+                } else if (code.status === 'unused') {
+                  activities.push({
+                    id: code.id,
+                    title: '创建激活码',
+                    description: `激活码 ${code.code} 已创建`,
+                    time: code.timeAgo,
+                    type: 'info',
+                  });
+                }
+              });
+            }
+
+            setRecentActivity(activities.slice(0, 5));
+          }
+        }
+        setLoading(false);
       } catch (error) {
-        console.error('检查用户权限失败:', error);
+        console.error('加载管理后台数据失败:', error);
         setPermissionError('无法验证您的权限');
         setTimeout(() => {
           router.push('/login?redirect=/admin');
@@ -126,77 +178,8 @@ export default function AdminPage() {
       }
     };
 
-    checkUserPermission();
+    loadAdminData();
   }, [router]);
-
-  // 加载统计数据
-  const loadStats = async () => {
-    try {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/dashboard/stats', { headers });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          setStats(data.data.stats);
-
-          // 从最近机器人数据生成活动记录
-          const activities: RecentActivity[] = [];
-
-          if (data.data.recentRobots && data.data.recentRobots.length > 0) {
-            data.data.recentRobots.forEach((robot: any) => {
-              if (robot.status === 'online') {
-                activities.push({
-                  id: robot.id,
-                  title: '机器人上线',
-                  description: `${robot.name} 已上线`,
-                  time: robot.lastActive,
-                  type: 'success',
-                });
-              }
-            });
-          }
-
-          // 从最近激活码数据生成活动记录
-          if (data.data.recentActivationCodes && data.data.recentActivationCodes.length > 0) {
-            data.data.recentActivationCodes.forEach((code: any) => {
-              if (code.status === 'used') {
-                activities.push({
-                  id: code.id,
-                  title: '激活码使用',
-                  description: `激活码 ${code.code} 已被使用`,
-                  time: code.timeAgo,
-                  type: 'success',
-                });
-              } else if (code.status === 'unused') {
-                activities.push({
-                  id: code.id,
-                  title: '创建激活码',
-                  description: `激活码 ${code.code} 已创建`,
-                  time: code.timeAgo,
-                  type: 'info',
-                });
-              }
-            });
-          }
-
-          setRecentActivity(activities.slice(0, 5));
-        }
-      }
-    } catch (error) {
-      console.error('加载统计数据失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // 显示权限错误
   if (permissionError) {
