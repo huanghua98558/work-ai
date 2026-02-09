@@ -121,11 +121,33 @@ export async function GET(request: NextRequest) {
     const result = await client.query(query, params);
 
     // 格式化返回数据
-    const formattedData = result.rows.map((row: any) => ({
-      ...row,
-      isActivated: !!row.bound_device_id, // 是否已激活（绑定了设备）
-      isBound: !!row.bound_user_id,       // 是否已绑定用户
-    }));
+    const formattedData = result.rows.map((row: any) => {
+      // 计算剩余有效期（天）
+      let remainingDays = 0;
+      if (row.expires_at) {
+        const now = new Date();
+        const expiresAt = new Date(row.expires_at);
+        const diffTime = expiresAt.getTime() - now.getTime();
+        remainingDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      }
+
+      // 计算有效期（天）
+      let validityPeriod = 0;
+      if (row.created_at && row.expires_at) {
+        const createdAt = new Date(row.created_at);
+        const expiresAt = new Date(row.expires_at);
+        const diffTime = expiresAt.getTime() - createdAt.getTime();
+        validityPeriod = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      return {
+        ...row,
+        validity_period: validityPeriod, // 总有效期（天）
+        remaining_days: remainingDays,  // 剩余有效期（天）
+        isActivated: !!row.bound_device_id, // 是否已激活（绑定了设备）
+        isBound: !!row.bound_user_id,       // 是否已绑定用户
+      };
+    });
 
     return NextResponse.json({
       success: true,

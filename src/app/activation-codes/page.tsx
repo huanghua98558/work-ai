@@ -51,6 +51,7 @@ interface ActivationCode {
   robot_name?: string | null;
   status: 'unused' | 'used' | 'expired' | 'disabled' | 'active';
   validity_period: number;
+  remaining_days: number; // 剩余有效期（天）
   bound_user_id: number | null;
   price?: string;
   created_by?: number;
@@ -498,7 +499,7 @@ export default function ActivationCodesPage() {
 
   // 解绑设备
   const handleUnbindDevice = async (code: string) => {
-    if (!confirm('确定要解绑设备吗？解绑后可以使用新设备激活。')) return;
+    if (!confirm('确定要解绑设备吗？解绑后激活码将重置，可以使用新设备重新激活。')) return;
 
     try {
       const token = localStorage.getItem('token');
@@ -515,6 +516,7 @@ export default function ActivationCodesPage() {
         body: JSON.stringify({
           code,
           reason: '管理员解绑',
+          resetStatus: true, // 重置激活码状态，允许重新激活
         }),
       });
 
@@ -523,7 +525,7 @@ export default function ActivationCodesPage() {
       if (data.success) {
         toast({
           title: '解绑成功',
-          description: '设备已解绑',
+          description: data.message || '设备已解绑，可重新激活',
           variant: 'success',
         });
         await loadData(0, false);
@@ -899,7 +901,25 @@ export default function ActivationCodesPage() {
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell>{code.validity_period} 天</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1 text-sm">
+                            <Clock className="h-3 w-3 text-gray-500" />
+                            <span>{code.validity_period} 天</span>
+                          </div>
+                          {code.remaining_days > 0 ? (
+                            <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                              <CheckCircle2 className="h-3 w-3" />
+                              <span>剩余 {code.remaining_days} 天</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                              <XCircle className="h-3 w-3" />
+                              <span>已过期</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
                           <Clock className="h-4 w-4" />

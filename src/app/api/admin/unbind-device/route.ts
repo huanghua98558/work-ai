@@ -13,6 +13,7 @@ const unbindDeviceSchema = z.object({
   code: z.string().optional(),
   robotId: z.string().optional(),
   reason: z.string().optional(),
+  resetStatus: z.boolean().optional().default(true), // 是否重置激活码状态（允许重新激活）
 }).refine(
   (data) => data.code || data.robotId,
   { message: "必须提供激活码或机器人ID" }
@@ -31,6 +32,7 @@ const unbindDeviceSchema = z.object({
  * 3. 删除设备绑定记录
  * 4. 删除设备token记录
  * 5. 记录解绑日志
+ * 6. 重置激活码状态（允许重新激活）
  */
 export async function POST(request: NextRequest) {
   const client = await pool.connect();
@@ -116,6 +118,23 @@ export async function POST(request: NextRequest) {
           `UPDATE activation_codes SET remark = $1 WHERE id = $2`,
           [newRemark, activationCode.id]
         );
+
+        // 重置激活码状态（允许重新激活）
+        if (validatedData.resetStatus) {
+          // 减少已使用次数（如果大于0）
+          const newUsedCount = Math.max(0, (activationCode.used_count || 0) - 1);
+
+          // 如果使用次数降为0，重置为unused状态
+          // 否则保持active状态
+          const newStatus = newUsedCount === 0 ? 'unused' : (activationCode.status === 'used' ? 'active' : activationCode.status);
+
+          await client.query(
+            `UPDATE activation_codes
+             SET status = $1, used_count = $2
+             WHERE id = $3`,
+            [newStatus, newUsedCount, activationCode.id]
+          );
+        }
       }
 
       // 删除设备绑定
@@ -135,11 +154,12 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "设备解绑成功",
+        message: validatedData.resetStatus ? "设备解绑成功，激活码已重置，可重新激活" : "设备解绑成功",
         data: {
           robotId,
           deviceId: deviceBinding.device_id,
           unboundAt: now.toISOString(),
+          resetStatus: validatedData.resetStatus,
         },
       });
     } catch (error) {
