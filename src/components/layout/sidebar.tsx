@@ -21,7 +21,7 @@ const navigation = [
   { name: 'AI 对话', href: '/chat', icon: Sparkles, gradient: 'from-violet-500 to-purple-600', requireAdmin: false },
   { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', requireAdmin: false },
   { name: '个人设置', href: '/profile', icon: User, gradient: 'from-emerald-500 to-green-600', requireAdmin: false },
-  { name: '帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-rose-500 to-pink-600', requireAdmin: false },
+  { name: '用户帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-rose-500 to-pink-600', requireAdmin: false },
 ];
 
 export function Sidebar() {
