@@ -3,20 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useUserRole } from '@/hooks/use-user-role';
 import {
   LayoutDashboard,
-  Key,
   Bot,
   MessageSquare,
   Database,
-  Activity,
   LogOut,
   User,
-  Settings,
-  Wifi,
-  FileText,
-  Shield,
   HelpCircle,
   Sparkles,
 } from 'lucide-react';
@@ -28,13 +21,11 @@ const navigation = [
   { name: 'AI 对话', href: '/chat', icon: Sparkles, gradient: 'from-violet-500 to-purple-600', requireAdmin: false },
   { name: '知识库', href: '/knowledge', icon: Database, gradient: 'from-pink-500 to-rose-600', requireAdmin: false },
   { name: '个人设置', href: '/profile', icon: User, gradient: 'from-emerald-500 to-green-600', requireAdmin: false },
-  { name: '管理后台', href: '/admin', icon: Shield, gradient: 'from-violet-500 to-purple-600', requireAdmin: true },
   { name: '帮助文档', href: '/help', icon: HelpCircle, gradient: 'from-rose-500 to-pink-600', requireAdmin: false },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { isAdmin, loading } = useUserRole();
 
   return (
     <div className="flex h-full w-64 flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 text-white border-r border-slate-800">
@@ -52,18 +43,9 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-2 overflow-y-auto p-4">
-        {navigation
-          .filter((item) => {
-            // 如果正在加载，显示所有菜单项
-            if (loading) return true;
-            // 如果是管理员，显示所有菜单项
-            if (isAdmin) return true;
-            // 如果是普通用户，只显示不需要管理员权限的菜单项
-            return !item.requireAdmin;
-          })
-          .map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+        {navigation.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
 
           return (
             <Link
