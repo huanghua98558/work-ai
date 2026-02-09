@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Code,
   HelpCircle,
+  Download,
 } from 'lucide-react';
 
 interface NavItem {

@@ -16,6 +16,8 @@ import {
   Settings,
   Wifi,
   FileText,
+  Shield,
+  HelpCircle,
 } from 'lucide-react';
 
 const navigation = [
