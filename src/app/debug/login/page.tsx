@@ -20,7 +20,7 @@ export default function DebugLoginPage() {
       setError(null);
       setResult(null);
 
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/user/login-by-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password }),
@@ -32,6 +32,11 @@ export default function DebugLoginPage() {
       if (!response.ok) {
         setError(data.error || '登录失败');
         return;
+      }
+
+      // 保存 token
+      if (data.data?.token) {
+        localStorage.setItem('token', data.data.token);
       }
 
       // 检查用户信息
@@ -101,6 +106,30 @@ export default function DebugLoginPage() {
     }
   };
 
+  const handleCheckLocalStorage = () => {
+    try {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+
+      let decoded = null;
+      if (token) {
+        // 简单解析 JWT token（不验证签名）
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          decoded = JSON.parse(atob(parts[1]));
+        }
+      }
+
+      setResult({
+        token: token ? `${token.substring(0, 50)}...` : null,
+        user: user ? JSON.parse(user) : null,
+        decodedToken: decoded,
+      });
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full space-y-6">
@@ -132,7 +161,7 @@ export default function DebugLoginPage() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button onClick={handleLogin} disabled={loading}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 登录测试
@@ -142,6 +171,9 @@ export default function DebugLoginPage() {
               </Button>
               <Button onClick={handleCheckUser} disabled={loading} variant="outline">
                 检查用户信息
+              </Button>
+              <Button onClick={handleCheckLocalStorage} disabled={loading} variant="secondary">
+                检查本地 Token
               </Button>
             </div>
 
@@ -179,9 +211,10 @@ export default function DebugLoginPage() {
               <li>点击"检查用户信息"查看数据库中该用户的角色</li>
               <li>如果 role 不是 'admin'，点击"初始化为管理员"</li>
               <li>点击"登录测试"测试登录流程</li>
-              <li>查看返回结果中的 user.role 字段</li>
-              <li>如果是 'admin'，说明已正确设置</li>
-              <li>访问 <a href="/admin/errors" className="text-blue-500 hover:underline">/admin/errors</a> 测试权限</li>
+              <li>点击"检查本地 Token"查看浏览器中存储的 token 和用户信息</li>
+              <li>查看返回结果中的 decodedToken.role 字段，应该是 'admin'</li>
+              <li>如果是 'admin'，访问 <a href="/admin/errors" className="text-blue-500 hover:underline">/admin/errors</a> 测试权限</li>
+              <li>访问 <a href="/dashboard" className="text-blue-500 hover:underline">/dashboard</a> 查看侧边栏是否显示管理员菜单</li>
             </ol>
           </CardContent>
         </Card>
