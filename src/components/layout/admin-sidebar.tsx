@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useUserRole } from '@/hooks/use-user-role';
 import {
@@ -66,7 +67,37 @@ const navigation: NavItem[] = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { isAdmin, loading } = useUserRole();
+  const { isAdmin, loading, userRole } = useUserRole();
+
+  // 从 localStorage 读取用户信息（备用）
+  const [localUserInfo, setLocalUserInfo] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          setLocalUserInfo(user);
+          console.log('[AdminSidebar] localStorage user:', user);
+        } catch (e) {
+          console.error('[AdminSidebar] 解析 localStorage user 失败:', e);
+        }
+      }
+    }
+  }, []);
+
+  // 优先使用 localStorage 中的用户角色，其次使用 token 解析结果
+  const effectiveRole = localUserInfo?.role || userRole?.role || 'user';
+  const effectiveIsAdmin = effectiveRole === 'admin';
+
+  console.log('[AdminSidebar] 角色判断:', {
+    localUserRole: localUserInfo?.role,
+    tokenRole: userRole?.role,
+    effectiveRole,
+    effectiveIsAdmin,
+    loading,
+  });
 
   // 按类别分组
   const categories = Array.from(new Set(navigation.map(item => item.category)));
@@ -94,7 +125,7 @@ export function AdminSidebar() {
           const items = navigation.filter(item => item.category === category);
           const visibleItems = items.filter(item => {
             if (loading) return true;
-            if (isAdmin) return true;
+            if (effectiveIsAdmin) return true;
             return !item.requireAdmin;
           });
 
@@ -148,10 +179,10 @@ export function AdminSidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">
-              {isAdmin ? '管理员' : '普通用户'}
+              {effectiveIsAdmin ? '管理员' : '普通用户'}
             </p>
             <p className="text-xs text-slate-400 truncate">
-              {loading ? '加载中...' : isAdmin ? '拥有完整权限' : '受限访问'}
+              {loading ? '加载中...' : effectiveIsAdmin ? '拥有完整权限' : '受限访问'}
             </p>
           </div>
         </div>

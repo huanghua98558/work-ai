@@ -14,24 +14,51 @@ export function useUserRole() {
 
   useEffect(() => {
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+
+    console.log('[useUserRole] 开始获取用户角色:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPrefix: token?.substring(0, 30) + '...',
+    });
+
     if (!token) {
+      console.log('[useUserRole] 未找到 token');
       setLoading(false);
       return;
     }
 
     const decoded = verifyToken(token);
+
+    console.log('[useUserRole] Token 解析结果:', {
+      hasDecoded: !!decoded,
+      userId: decoded?.userId,
+      phone: decoded?.phone,
+      role: decoded?.role,
+    });
+
     if (decoded) {
       setUserRole({
         userId: decoded.userId,
         phone: decoded.phone,
         role: decoded.role as 'admin' | 'user',
       });
+      console.log('[useUserRole] 用户角色已设置:', decoded.role);
+    } else {
+      console.log('[useUserRole] Token 解析失败');
     }
+
     setLoading(false);
   }, []);
 
   const isAdmin = userRole?.role === 'admin';
   const isUser = userRole?.role === 'user';
+
+  console.log('[useUserRole] 当前状态:', {
+    userRole,
+    isAdmin,
+    isUser,
+    loading,
+  });
 
   return {
     userRole,
