@@ -101,13 +101,21 @@ export async function middleware(request: NextRequest) {
     const cookieToken = request.cookies.get("accessToken")?.value;
     const token = authHeader?.replace("Bearer ", "") || cookieToken;
 
+    console.log('[Middleware] 请求路径:', pathname);
+    console.log('[Middleware] Token 信息:', {
+      hasAuthHeader: !!authHeader,
+      hasCookie: !!cookieToken,
+      tokenLength: token?.length || 0,
+    });
+
     // 验证 Token
     let user = null;
     if (token) {
       try {
         user = verifyToken(token);
+        console.log('[Middleware] Token 验证成功:', { userId: user.userId, phone: user.phone, role: user.role });
       } catch (error) {
-        console.error("Token 验证失败:", error);
+        console.error("[Middleware] Token 验证失败:", error);
       }
     }
 

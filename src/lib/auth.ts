@@ -13,12 +13,29 @@ export function getAuthToken(request: Request): string | null {
 }
 
 export function authenticate(request: Request): JWTPayload | null {
+  // 方法1：从 Authorization header 读取
   const token = getAuthToken(request);
-  if (!token) {
-    return null;
+  if (token) {
+    const decoded = verifyToken(token);
+    if (decoded) {
+      return decoded;
+    }
   }
 
-  return verifyToken(token);
+  // 方法2：从 middleware 传递的 headers 读取（优先级更高）
+  const userId = request.headers.get("x-user-id");
+  const phone = request.headers.get("x-user-phone");
+  const role = request.headers.get("x-user-role");
+
+  if (userId && phone && role) {
+    return {
+      userId: parseInt(userId),
+      phone,
+      role,
+    };
+  }
+
+  return null;
 }
 
 export function requireAuth(request: Request): JWTPayload {

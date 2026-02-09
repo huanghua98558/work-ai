@@ -19,7 +19,15 @@ export default function TestPage() {
         const parsedUser = user ? JSON.parse(user) : null
 
         // 从 API 获取最新信息
-        const response = await fetch('/api/users/me')
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        }
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
+        const response = await fetch('/api/users/me', { headers })
         const data = await response.json()
 
         setUserInfo({

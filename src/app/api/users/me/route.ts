@@ -14,6 +14,14 @@ export async function GET(request: NextRequest) {
 
   let client;
   try {
+    // 调试：打印请求头
+    console.log('[UsersMe] 请求头信息:', {
+      authHeader: request.headers.get("authorization")?.substring(0, 20),
+      xUserId: request.headers.get("x-user-id"),
+      xUserPhone: request.headers.get("x-user-phone"),
+      xUserRole: request.headers.get("x-user-role"),
+    });
+
     const user = requireAuth(request);
 
     console.log('[UsersMe] 获取用户信息:', { userId: user.userId, phone: user.phone, role: user.role });

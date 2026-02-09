@@ -39,3 +39,9 @@ export function useUserRole() {
     loading,
   };
 }
+
+// 用于在 fetch 请求中添加 token 的辅助函数
+export function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}

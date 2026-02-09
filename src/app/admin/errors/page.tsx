@@ -35,7 +35,16 @@ export default function AdminErrorsPage() {
   useEffect(() => {
     const checkUserPermission = async () => {
       try {
-        const response = await fetch('/api/users/me');
+        const token = localStorage.getItem('token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/users/me', { headers });
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -78,7 +87,17 @@ export default function AdminErrorsPage() {
   const fetchErrors = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/errors?limit=100');
+
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/admin/errors?limit=100', { headers });
       const data = await response.json();
 
       if (data.success) {
