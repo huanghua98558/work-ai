@@ -39,26 +39,14 @@ export async function POST(request: NextRequest) {
       const user = result.rows[0];
 
       // 验证密码
-      let isPasswordValid = false;
-
-      // 方式1：使用bcrypt验证（推荐）
-      if (user.password_hash) {
-        try {
-          isPasswordValid = await bcrypt.compare(password, user.password_hash);
-        } catch (error) {
-          console.log('bcrypt验证失败，尝试其他验证方式');
-        }
+      if (!user.password_hash) {
+        return NextResponse.json(
+          { success: false, error: '该用户未设置密码' },
+          { status: 401 }
+        );
       }
 
-      // 方式2：明文密码验证（临时兼容，用于测试账户）
-      if (!isPasswordValid && user.password_hash === password) {
-        isPasswordValid = true;
-      }
-
-      // 方式3：手机号作为密码（临时兼容，用于旧测试账户）
-      if (!isPasswordValid && password === user.phone) {
-        isPasswordValid = true;
-      }
+      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
       if (!isPasswordValid) {
         return NextResponse.json(

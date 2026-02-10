@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/db";
 import { sql } from "drizzle-orm";
 import { generateAccessToken, generateRefreshToken, JWTPayload } from "@/lib/jwt";
+import { hashPassword } from "@/lib/password";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -42,10 +43,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 生成密码哈希
+    const passwordHash = await hashPassword(validatedData.password);
+
     // 创建新用户
     const newUserResult = await db.execute(sql`
-      INSERT INTO users (phone, nickname, role, status)
-      VALUES (${validatedData.phone}, ${validatedData.nickname || "未命名"}, 'user', 'active')
+      INSERT INTO users (phone, nickname, password_hash, role, status)
+      VALUES (${validatedData.phone}, ${validatedData.nickname || "未命名"}, ${passwordHash}, 'user', 'active')
       RETURNING id, phone, nickname, role, status, avatar, created_at
     `);
 
