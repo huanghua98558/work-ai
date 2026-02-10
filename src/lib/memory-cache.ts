@@ -151,3 +151,13 @@ export async function cache<T>(
 ): Promise<T> {
   return memoryCache.getOrSet(key, fetcher, ttl);
 }
+
+// 导出缓存统计函数（用于健康检查）
+export function getCacheStats() {
+  const stats = memoryCache.getStats();
+  return {
+    size: stats.total,
+    hits: 0, // 简化实现，实际应用中可以追踪命中率
+    misses: 0,
+  };
+}

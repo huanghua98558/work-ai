@@ -55,17 +55,23 @@ function getPoolConfig(): PoolConfig {
     // 空闲连接超时（5分钟后回收空闲连接，避免频繁创建连接）
     idleTimeoutMillis: 300000,  // 从 10秒 改为 5分钟
 
-    // 连接超时（5秒）
-    connectionTimeoutMillis: 5000,  // 从 10秒 改为 5秒
+    // 连接超时（10秒，给足够的时间）
+    connectionTimeoutMillis: 10000,  // 从 5秒 改为 10秒
 
-    // 查询超时（30秒）
-    query_timeout: 30000,
+    // 查询超时（60秒，防止长时间运行的查询）
+    query_timeout: 60000,
 
     // 保持连接活跃
     keepAlive: true,
 
     // 连接活跃初始延迟（5秒）
     keepAliveInitialDelayMillis: 5000,
+
+    // 连接重试次数
+    connectionRetryLimit: 3,
+
+    // 连接重试延迟（毫秒）
+    connectionRetryDelay: 2000,
 
     // 应用名称（便于在数据库中识别连接）
     application_name: `workbot-${env}`,
@@ -204,6 +210,25 @@ export async function getDatabase(): Promise<ReturnType<typeof drizzle>> {
   return database;
 }
 
+// 获取连接池供直接使用（异步，带自动恢复）
+export async function getPool(): Promise<Pool> {
+  const { pool: connectionPool } = await initializeDatabase();
+
+  // 健康检查
+  try {
+    await connectionPool.query('SELECT 1');
+  } catch (error) {
+    console.error('[数据库] 连接池健康检查失败，尝试重新连接:', error);
+
+    // 尝试重新初始化连接池
+    await closeDatabase();
+    const { pool: newPool } = await initializeDatabase();
+    return newPool;
+  }
+
+  return connectionPool;
+}
+
 // 检查数据库连接健康状态
 export async function checkDatabaseHealth() {
   try {
@@ -240,12 +265,6 @@ export function getPoolStats(pool?: Pool) {
     idleCount: connectionPool.idleCount,
     waitingCount: connectionPool.waitingCount,
   };
-}
-
-// 获取连接池供直接使用（异步）
-export async function getPool(): Promise<Pool> {
-  const { pool: connectionPool } = await initializeDatabase();
-  return connectionPool;
 }
 
 // 同步获取连接池（用于紧急情况，如果未初始化会抛出错误）

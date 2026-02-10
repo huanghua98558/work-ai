@@ -13,6 +13,8 @@ export interface ConnectionManager {
   getAllConnections(): WebSocketConnection[];
   getConnectionCount(): number;
   broadcast(message: any, excludeRobotIds?: string[]): void;
+  startHeartbeatCheck(): void;
+  stopHeartbeatCheck(): void;
 }
 
 /**
@@ -21,6 +23,9 @@ export interface ConnectionManager {
 class ConnectionManagerImpl implements ConnectionManager {
   private connections: Map<WebSocket, WebSocketConnection> = new Map();
   private robotIdMap: Map<string, WebSocket> = new Map();
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private readonly HEARTBEAT_INTERVAL = 30000; // 30秒检查一次
+  private readonly HEARTBEAT_TIMEOUT = 60000; // 60秒超时
 
   /**
    * 添加连接
@@ -29,11 +34,18 @@ class ConnectionManagerImpl implements ConnectionManager {
     const connection: WebSocketConnection = {
       ws,
       authenticated: false,
+      lastHeartbeatAt: new Date(),
+      connectedAt: Date.now(),
     };
 
     this.connections.set(ws, connection);
 
     ws.on('close', () => {
+      this.removeConnection(ws);
+    });
+
+    ws.on('error', (error) => {
+      console.error(`[ConnectionManager] 连接错误:`, error);
       this.removeConnection(ws);
     });
 
@@ -48,7 +60,10 @@ class ConnectionManagerImpl implements ConnectionManager {
 
     if (connection && connection.robotId) {
       this.robotIdMap.delete(connection.robotId);
-      console.log(`[ConnectionManager] 连接已移除: ${connection.robotId}`);
+      const connectionDuration = Date.now() - connection.connectedAt;
+      console.log(
+        `[ConnectionManager] 连接已移除: ${connection.robotId}, 连接时长: ${Math.round(connectionDuration / 1000)}s`
+      );
     }
 
     this.connections.delete(ws);
@@ -85,8 +100,9 @@ class ConnectionManagerImpl implements ConnectionManager {
    */
   broadcast(message: any, excludeRobotIds: string[] = []): void {
     let sentCount = 0;
+    const deadConnections: WebSocket[] = [];
 
-    for (const connection of this.connections.values()) {
+    for (const [ws, connection] of this.connections.entries()) {
       if (!connection.authenticated || !connection.robotId) {
         continue;
       }
@@ -95,11 +111,22 @@ class ConnectionManagerImpl implements ConnectionManager {
         continue;
       }
 
-      if (connection.ws.readyState === WebSocket.OPEN) {
-        connection.ws.send(JSON.stringify(message));
-        sentCount++;
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(message));
+          sentCount++;
+        } else {
+          // 连接已关闭，标记为需要清理
+          deadConnections.push(ws);
+        }
+      } catch (error) {
+        console.error(`[ConnectionManager] 发送消息失败: ${connection.robotId}`, error);
+        deadConnections.push(ws);
       }
     }
+
+    // 清理死连接
+    deadConnections.forEach(ws => this.removeConnection(ws));
 
     console.log(`[ConnectionManager] 广播消息到 ${sentCount} 个连接`);
   }
@@ -126,6 +153,16 @@ class ConnectionManagerImpl implements ConnectionManager {
   }
 
   /**
+   * 更新心跳时间
+   */
+  updateHeartbeat(ws: WebSocket): void {
+    const connection = this.connections.get(ws);
+    if (connection) {
+      connection.lastHeartbeatAt = new Date();
+    }
+  }
+
+  /**
    * 根据 WebSocket 获取连接
    */
   getConnectionByWs(ws: WebSocket): WebSocketConnection | undefined {
@@ -140,12 +177,81 @@ class ConnectionManagerImpl implements ConnectionManager {
   }
 
   /**
+   * 启动心跳检查
+   */
+  startHeartbeatCheck(): void {
+    if (this.heartbeatInterval) {
+      return;
+    }
+
+    console.log('[ConnectionManager] 启动心跳检查');
+
+    this.heartbeatInterval = setInterval(() => {
+      this.checkHeartbeats();
+    }, this.HEARTBEAT_INTERVAL);
+  }
+
+  /**
+   * 停止心跳检查
+   */
+  stopHeartbeatCheck(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      console.log('[ConnectionManager] 停止心跳检查');
+    }
+  }
+
+  /**
+   * 检查心跳
+   */
+  private checkHeartbeats(): void {
+    const now = new Date();
+    const timeoutConnections: Array<{ ws: WebSocket; connection: WebSocketConnection; elapsed: number }> = [];
+
+    for (const [ws, connection] of this.connections.entries()) {
+      const elapsed = now.getTime() - connection.lastHeartbeatAt.getTime();
+
+      if (elapsed > this.HEARTBEAT_TIMEOUT) {
+        timeoutConnections.push({ ws, connection, elapsed });
+      }
+    }
+
+    // 处理超时连接
+    if (timeoutConnections.length > 0) {
+      console.warn(
+        `[ConnectionManager] 发现 ${timeoutConnections.length} 个超时连接，开始清理`
+      );
+
+      timeoutConnections.forEach(({ ws, connection, elapsed }) => {
+        console.warn(
+          `[ConnectionManager] 关闭超时连接: ${connection.robotId || 'unknown'}, 超时时间: ${Math.round(elapsed / 1000)}s`
+        );
+
+        try {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              code: 'HEARTBEAT_TIMEOUT',
+              message: '心跳超时，连接已断开'
+            }));
+            ws.close(1000, 'Heartbeat timeout');
+          }
+        } catch (error) {
+          console.error('[ConnectionManager] 关闭超时连接失败:', error);
+        }
+
+        this.removeConnection(ws);
+      });
+    }
+  }
+
+  /**
    * 清理超时连接
    */
-  cleanupTimeoutConnections(timeoutMs: number = 60 * 1000): void {
+  cleanupTimeoutConnections(timeoutMs: number = 60 * 1000): number {
     const now = Date.now();
     const toRemove: WebSocket[] = [];
-    const timeoutInfo: Array<{ robotId: string; elapsed: number }> = [];
 
     for (const [ws, connection] of this.connections.entries()) {
       if (!connection.lastHeartbeatAt) {
@@ -158,10 +264,6 @@ class ConnectionManagerImpl implements ConnectionManager {
           `[ConnectionManager] 发现超时连接: ${connection.robotId}, 超时时间: ${Math.round(elapsed / 1000)}秒`
         );
         toRemove.push(ws);
-        timeoutInfo.push({
-          robotId: connection.robotId || 'unknown',
-          elapsed,
-        });
       }
     }
 
@@ -178,12 +280,8 @@ class ConnectionManagerImpl implements ConnectionManager {
 
     // 记录清理日志
     if (toRemove.length > 0) {
-      const totalTimeout = timeoutInfo.reduce((sum, info) => sum + info.elapsed, 0);
-      const avgTimeout = totalTimeout / timeoutInfo.length;
-
       console.log(
         `[ConnectionManager] 清理了 ${toRemove.length} 个超时连接, ` +
-          `平均超时时间: ${Math.round(avgTimeout / 1000)}秒, ` +
           `总连接数: ${this.connections.size}`
       );
     }
@@ -238,3 +336,7 @@ class ConnectionManagerImpl implements ConnectionManager {
 
 // 导出单例实例
 export const connectionManager = new ConnectionManagerImpl();
+
+// 启动心跳检查
+connectionManager.startHeartbeatCheck();
+

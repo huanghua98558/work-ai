@@ -2,68 +2,76 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { checkDatabaseHealth, getPoolStats } from '@/lib/db';
+import { getCacheStats } from '@/lib/memory-cache';
 
 /**
- * 服务健康检查端点
+ * 系统健康检查 API
+ *
  * GET /api/health
  *
- * 用于看门狗进程监控服务健康状态
+ * 返回系统各组件的健康状态，包括：
+ * - 数据库连接状态
+ * - 缓存状态
+ * - 内存使用情况
+ * - 运行时间
  */
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // 检查数据库连接
-    let dbStatus = 'disconnected';
-    let dbLatency = 0;
+    // 检查数据库健康状态
+    const dbHealth = await checkDatabaseHealth();
 
-    try {
-      // 这里可以添加实际的数据库检查逻辑
-      dbStatus = 'connected';
-      dbLatency = Date.now() - startTime;
-    } catch (error) {
-      dbStatus = 'error';
-    }
+    // 获取缓存统计信息
+    const cacheStats = getCacheStats();
 
-    // 检查内存使用
+    // 获取内存使用情况
     const memoryUsage = process.memoryUsage();
-    const memoryUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
 
-    // 检查运行时间
+    // 获取系统运行时间
     const uptime = process.uptime();
 
-    // 准备响应数据
-    const healthData = {
-      status: 'healthy',
+    // 检查响应时间
+    const responseTime = Date.now() - startTime;
+
+    // 判断整体健康状态
+    const isHealthy = dbHealth.healthy && responseTime < 5000;
+
+    return NextResponse.json({
+      success: true,
+      status: isHealthy ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
-      uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
-      memory: {
-        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
-        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
-        rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
-        usagePercent: Math.round(memoryUsagePercent),
+      responseTime: `${responseTime}ms`,
+      components: {
+        database: {
+          status: dbHealth.healthy ? 'healthy' : 'unhealthy',
+          message: dbHealth.message,
+          stats: dbHealth.stats,
+        },
+        cache: {
+          status: 'active',
+          stats: cacheStats,
+        },
+        memory: {
+          heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+          heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+          rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+        },
+        system: {
+          uptime: `${Math.floor(uptime / 60)}m ${Math.floor(uptime % 60)}s`,
+          nodeVersion: process.version,
+          platform: process.platform,
+        },
       },
-      database: {
-        status: dbStatus,
-        latency: `${dbLatency}ms`,
-      },
-      latency: `${Date.now() - startTime}ms`,
-      version: process.env.npm_package_version || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-    };
-
-    // 如果内存使用超过90%，返回degraded状态
-    if (memoryUsagePercent > 90) {
-      healthData.status = 'degraded';
-    }
-
-    return NextResponse.json(healthData);
-  } catch (error) {
+    });
+  } catch (error: any) {
     return NextResponse.json(
       {
+        success: false,
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error.message,
       },
       { status: 503 }
     );
