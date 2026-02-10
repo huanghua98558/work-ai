@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
              r.name as robot_name,
              r.bot_id as robot_id
            FROM activation_codes ac
-           LEFT JOIN robots r ON ac.robot_id = r.bot_id
+           LEFT JOIN robots r ON ac.robot_id = r.robot_id
            ORDER BY ac.created_at DESC
            LIMIT 5`
         );
